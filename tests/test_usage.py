@@ -205,7 +205,7 @@ assert 'result' not in reply
             content = usage_content(usage, 44, time.time())
             from ai_sessions.screen import width
             self.assertTrue(all(width(text)<=40 for text,_ in content))
-            self.assertIn('2023-11-14 22:13:20', '\n'.join(text for text,_ in content))
+            self.assertIn(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(1700000000)), '\n'.join(text for text,_ in content))
             limit = max_usage_scroll(usage, 44, 16)
             self.assertGreater(limit, 0)
             self.assertIn('ROW_019', render_usage(Screen(44,16), usage, limit-3).plain())

@@ -308,7 +308,7 @@ RU.update({'◉ Official CLIs · current signed-in accounts': '◉ Официа�
  'CLI could not report limits; check the official CLI': 'CLI не смог сообщить лимиты; проверьте официальный '
                                                         'CLI',
  'Snapshot time unknown': 'Время снимка неизвестно',
- 'Snapshot: {timestamp} UTC': 'Снимок: {timestamp} UTC',
+ 'Snapshot: {timestamp}': 'Снимок: {timestamp}',
  'Codex CLI · live': 'Codex CLI · актуальные',
  'Codex CLI · cached': 'Codex CLI · кеш',
  'agy CLI · live': 'agy CLI · актуальные',
@@ -321,7 +321,7 @@ RU.update({'◉ Official CLIs · current signed-in accounts': '◉ Официа�
                                                                        'Esc / Backspace назад   Q выход',
  'Fetching current limits via official CLIs…': 'Запрашиваю актуальные лимиты через официальные CLI…',
  'Official CLI snapshots · R refresh': 'Снимки официальных CLI · R обновить',
- 'Last check: {timestamp} UTC': 'Последняя проверка: {timestamp} UTC',
+ 'Last check: {timestamp}': 'Последняя проверка: {timestamp}',
  'Show only cached usage without launching official CLIs': 'Показать сохранённые лимиты без запуска '
                                                            'официальных CLI'})
 

@@ -854,7 +854,9 @@ def fetch_live_usage(collector, cancel: threading.Event | None = None, timeout: 
         return limits, [details]
 
     with ThreadPoolExecutor(max_workers=4) as pool:
-        clients = ("claude", "codex", "agy", *(("deepseek",) if deepseek_key() else ()))
+        # The DeepSeek key belongs to the real user, never to an alternate --home.
+        with_deepseek = collector.home == Path.home() and bool(deepseek_key())
+        clients = ("claude", "codex", "agy", *(("deepseek",) if with_deepseek else ()))
         pending = {client: pool.submit(fetch, client) for client in clients}
         for client, future in pending.items():
             provider = {"claude": "anthropic", "codex": "openai-codex", "agy": "google-antigravity",
@@ -920,7 +922,15 @@ def reset_text(value: float, now: float) -> str:
 def snapshot_text(updated: float) -> str:
     if not updated:
         return tr('Snapshot time unknown')
-    return tr('Snapshot: {timestamp} UTC', timestamp=time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(updated)))
+    return tr('Snapshot: {timestamp}', timestamp=local_stamp(updated))
+
+
+def local_stamp(value: float) -> str:
+    """Local wall-clock time with its current UTC offset, e.g. 22:39:36 +03."""
+    moment = datetime.fromtimestamp(value).astimezone()
+    offset = moment.strftime("%z")
+    offset = offset[:3] if offset.endswith("00") else offset[:3] + ":" + offset[3:]
+    return moment.strftime("%Y-%m-%d %H:%M:%S ") + offset
 
 
 def usage_content(usage: Usage, cols: int, now: float) -> list[tuple[str, str]]:
@@ -944,6 +954,8 @@ def usage_content(usage: Usage, cols: int, now: float) -> list[tuple[str, str]]:
             if account:
                 heading += "".join(f"  ·  {v}" for v in (account.name, account.plan) if v)
             source = r.source if r.status != "unavailable" else ""
+            if source.startswith(PROVIDERS.get(r.provider, "\0") + " · "):
+                source = source[len(PROVIDERS[r.provider]) + 3:]
             content.extend((text, "cyan") for text in wrap(heading + (f"  ·  {tr(source)}" if source else ""), cols - 4))
             if r.provider in multiple:
                 content.append(("  " + tr("separate account · limits are not shared with other {provider} accounts",
@@ -1064,6 +1076,6 @@ def render_usage(base: Screen, usage: Usage, scroll: int = 0, refreshing: bool =
     base.put(rows - 2, 2, tr('Without a snapshot, remaining usage is unknown.'), "muted", limit=cols - 4)
     footer = tr('Fetching current limits via official CLIs…') if refreshing else tr('Official CLI snapshots · R refresh')
     if usage.checked and not refreshing:
-        footer = tr('Last check: {timestamp} UTC', timestamp=time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(usage.checked)))
+        footer = tr('Last check: {timestamp}', timestamp=local_stamp(usage.checked))
     base.put(rows - 1, 2, message or footer, "amber" if message or refreshing else "faint", limit=cols - 4)
     return base
