@@ -40,12 +40,14 @@ jobs:
         if: runner.os == 'macOS'
         env:
           MACOSX_DEPLOYMENT_TARGET: "11.0"
-          RUSTFLAGS: "--remap-path-prefix=${{ github.workspace }}=. --remap-path-prefix=${{ runner.home }}=."
         run: |
+          # There is no runner.home context; use the real $HOME of the runner.
+          export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=. --remap-path-prefix=$HOME=."
           cargo build --release
           # No pipe: grep -q would close it early and fail strings under pipefail.
           strings target/release/ais-shell > "$RUNNER_TEMP/strings.txt"
-          if grep -F -q "${{ runner.home }}" "$RUNNER_TEMP/strings.txt"; then
+          if grep -F -q "$HOME/" "$RUNNER_TEMP/strings.txt"; then
+            grep -F "$HOME/" "$RUNNER_TEMP/strings.txt" | head -5 >&2
             echo "Build path leaked into release binary" >&2
             exit 1
           fi
