@@ -1,0 +1,31 @@
+[package]
+name = "ais-shell"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.88"
+description = "ais · AI Sessions — a native workspace for AI coding CLIs (Claude Code, Codex, Gemini, agy, OMP, Pi)"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/repentandliveholy/ais"
+homepage = "https://github.com/repentandliveholy/ais"
+keywords = ["terminal", "ai", "claude", "codex", "gui"]
+categories = ["command-line-utilities", "development-tools"]
+exclude = ["dist/", ".remember/", ".DS_Store"]
+
+[dependencies]
+alacritty_terminal = "0.26.0"
+eframe = { version = "0.31", default-features = false, features = ["glow", "default_fonts", "wayland", "x11"] }
+percent-encoding = "2.3.2"
+portable-pty = "0.9"
+rusqlite = { version = "0.43.0", features = ["bundled"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
+debug = "line-tables-only"
+split-debuginfo = "packed"
+codegen-units = 1
+opt-level = "s"
+panic = "abort"

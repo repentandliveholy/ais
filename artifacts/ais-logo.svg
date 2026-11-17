@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">ais · AI Sessions</title>
+  <desc id="desc">AI Sessions. All conversations. One entry point.</desc>
+  <defs>
+    <linearGradient id="flow" x1="52" y1="60" x2="270" y2="290" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#73d8f4"/><stop offset=".52" stop-color="#b9a3ff"/><stop offset="1" stop-color="#95e1b4"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="360" rx="38" fill="#11151f"/>
+  <g transform="translate(36 24) scale(.61)">
+    <g fill="none" stroke="url(#flow)" stroke-width="25" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M131 350V212c0-60 45-108 101-108s101 48 101 108v138"/>
+      <path d="M131 273h202"/><path d="M381 161v112c0 59-48 107-107 107H171"/>
+    </g>
+    <circle cx="131" cy="350" r="13" fill="#73d8f4"/><circle cx="381" cy="161" r="13" fill="#95e1b4"/>
+    <circle cx="256" cy="273" r="27" fill="#11151f"/><path d="m249 258 22 15-22 15z" fill="#edf1f8"/>
+  </g>
+  <!-- Code-native wordmark: portable paths, no external fonts required. -->
+  <g fill="none" stroke-width="15" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke="#73d8f4" d="M397 204v-58c0-30 20-50 47-50s47 20 47 50v58m-94-48h94"/>
+    <path stroke="#b9a3ff" d="M548 139v65"/>
+    <path stroke="#95e1b4" d="M694 102h-54c-38 0-38 50 0 50h24c38 0 38 50 0 50h-58"/>
+  </g>
+  <circle cx="548" cy="105" r="9" fill="#b9a3ff"/>
+  <text x="752" y="143" fill="#edf1f8" font-family="Menlo, DejaVu Sans Mono, monospace" font-size="27" letter-spacing="4">AI SESSIONS</text>
+  <text x="752" y="181" fill="#a0aec5" font-family="Menlo, DejaVu Sans Mono, monospace" font-size="18">All conversations. One entry point.</text>
+  <path d="M392 251h706" stroke="#263449" stroke-width="1"/>
+  <g font-family="Menlo, DejaVu Sans Mono, monospace" font-size="17">
+    <text x="395" y="289" fill="#95e1b4">OMP</text><text x="464" y="289" fill="#f3ca86">CLAUDE</text>
+    <text x="572" y="289" fill="#95bbff">CODEX</text><text x="667" y="289" fill="#b9a3ff">AGY</text>
+    <text x="737" y="289" fill="#73d8f4">GEMINI</text><text x="845" y="289" fill="#f291a6">PI</text>
+  </g>
+</svg>

@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.ais-cache/
+artifacts/live-*
+ais-shell/target/
+ais-shell/dist/
+.DS_Store
+.remember/
+**/.remember/
+/warp/
+/CACHE-PANEL.md
+/target/
