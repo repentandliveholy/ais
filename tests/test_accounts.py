@@ -130,11 +130,15 @@ class DeepSeekTests(unittest.TestCase):
             {"currency": "CNY", "total_balance": "110.00", "granted_balance": "10.00", "topped_up_balance": "100.00"},
             {"currency": "USD", "total_balance": "0.00", "granted_balance": "0.00", "topped_up_balance": "0.00"}]}
         limits = parse_deepseek_balance(payload, time.time())
-        self.assertEqual([l.status for l in limits], ["balance", "balance-empty"])
+        self.assertEqual([l.status for l in limits], ["balance"])  # Empty USD is hidden.
         text = "\n".join(t for t, _ in usage_content(Usage(limits, loaded=True), 140, time.time()))
         self.assertIn("balance ¥110.00", text)
         self.assertIn("topped up ¥100.00", text)
-        self.assertIn("balance exhausted", text)
+        self.assertNotIn("balance exhausted", text)
+        empty = parse_deepseek_balance({"is_available": False, "balance_infos": [
+            {"currency": "USD", "total_balance": "0.00", "granted_balance": "0", "topped_up_balance": "0"}]}, 0)
+        self.assertEqual(empty[0].status, "balance-empty")
+        self.assertIn("balance exhausted", "\n".join(t for t, _ in usage_content(Usage(empty, loaded=True), 140, time.time())))
         with self.assertRaises(ValueError):
             parse_deepseek_balance({"error": "x"}, 0)
 

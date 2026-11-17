@@ -507,3 +507,11 @@ RU.update({
     'granted {amount}': 'бонусы {amount}',
     'topped up {amount}': 'пополнено {amount}',
 })
+
+# Usage strip.
+RU.update({
+    'LIMITS': 'ЛИМИТЫ',
+    'U — full usage': 'U — все лимиты',
+    'loading…': 'загрузка…',
+    'unavailable': 'недоступно',
+})

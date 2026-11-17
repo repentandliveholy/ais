@@ -177,3 +177,24 @@ class CommandLineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LayoutTests(unittest.TestCase):
+    def test_projects_and_sessions_share_the_split_and_strip(self):
+        from ai_sessions.ui import layout
+        from ai_sessions.usage import demo_usage
+        cwd = str(ROOT)
+        for cols in (120, 144, 170, 220):
+            self.assertEqual(layout(cols, View(cwd, Path.home(), tab="projects")),
+                             layout(cols, View(cwd, Path.home(), tab="sessions")))
+        self.assertEqual(layout(144, View(cwd, Path.home()))[2], 0)
+        rows = demo_sessions(cwd)
+        for tab in ("projects", "sessions"):
+            screen = render(rows, View(cwd, Path.home(), loaded=True, tab=tab), 170, 44, usage=demo_usage())
+            text = screen.plain()
+            self.assertIn("LIMITS", text)
+            self.assertIn("side", text)  # Second Claude account has its own bars.
+            lines = text.splitlines()
+            y = next(i for i, row in enumerate(lines) if "LIMITS" in row)
+            self.assertEqual(screen.hit_at(y + 3, lines[y].index("LIMITS")), ("tab", "usage"))
+        self.assertNotIn("LIMITS", render(rows, View(cwd, Path.home(), loaded=True), 144, 44, usage=demo_usage()).plain())

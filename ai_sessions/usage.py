@@ -95,6 +95,9 @@ def parse_deepseek_balance(payload: object, updated: float) -> list["Limit"]:
                             "DeepSeek API · live", status="balance-empty" if empty else "balance", id=currency))
     if not limits:
         raise ValueError(tr('API did not report a balance'))
+    funded = [limit for limit in limits if limit.status == "balance"]
+    if funded:
+        limits = funded  # An empty second currency is not an exhausted account.
     if payload.get("is_available") is False:
         limits[0].status = "balance-empty"
     return limits
@@ -1079,3 +1082,64 @@ def render_usage(base: Screen, usage: Usage, scroll: int = 0, refreshing: bool =
         footer = tr('Last check: {timestamp}', timestamp=local_stamp(usage.checked))
     base.put(rows - 1, 2, message or footer, "amber" if message or refreshing else "faint", limit=cols - 4)
     return base
+
+
+STRIP_NAMES = {"anthropic": "Claude", "openai-codex": "Codex", "google-antigravity": "agy", "deepseek": "DeepSeek"}
+STRIP_STYLES = {"anthropic": "amber", "openai-codex": "blue", "google-antigravity": "accent", "deepseek": "cyan"}
+
+
+def compact_reset(limit: Limit, now: float) -> str:
+    left = limit.reset - now if limit.reset else 0
+    if left <= 0:
+        return ""
+    if left >= 86400:
+        return f"{int(left // 86400)}d"
+    if left >= 3600:
+        return f"{int(left // 3600)}h"
+    return f"{max(1, int(left // 60))}m"
+
+
+def usage_strip_lines(usage: Usage, width: int, now: float) -> list[list[tuple[str, str]]]:
+    """Narrow, graphical summary: one header per account, one bar per window."""
+    groups: list[tuple[str, str]] = []
+    for r in usage.limits:
+        if (r.provider, r.account) not in groups:
+            groups.append((r.provider, r.account))
+    per_provider: dict[str, int] = {}
+    for provider, _ in groups:
+        per_provider[provider] = per_provider.get(provider, 0) + 1
+    rows: list[list[tuple[str, str]]] = []
+    for provider, key in groups:
+        items = [r for r in usage.limits if r.provider == provider and r.account == key]
+        account = usage.account(provider, key)
+        tag = ""
+        if account:
+            if per_provider[provider] > 1 and account.email:
+                tag = account.email.split("@")[0]
+            tag = " · ".join(v for v in (account.plan, tag) if v)
+        if rows:
+            rows.append([])
+        name = STRIP_NAMES.get(provider, provider)
+        rows.append([(name, STRIP_STYLES.get(provider, "text"), True)] + ([(" " + tag, "muted")] if tag else []))
+        if all(r.status == "unavailable" for r in items):
+            rows.append([("  " + tr("unavailable"), "faint")])
+            continue
+        for r in items:
+            if r.status in ("balance", "balance-empty"):
+                total = r.label.split("  ·  ")[0]
+                rows.append([("  " + total, "red" if r.status == "balance-empty" else "green")]
+                            + ([(" ⚠", "red")] if r.status == "balance-empty" else []))
+        for window, short in (("5h", "5h"), ("week", "wk")):
+            candidates = [r for r in items if r.window == window and r.used is not None and r.status != "unavailable"]
+            if not candidates:
+                continue
+            r = max(candidates, key=lambda item: item.used)
+            stale = now - r.updated > 3600 or bool(r.reset and r.reset <= now)
+            used = min(1.0, max(0.0, r.used))
+            style = "muted" if stale else "red" if used >= .9 else "amber" if used >= .7 else "green"
+            reset = compact_reset(r, now)
+            bar = max(4, width - 3 - 5 - 4)
+            filled = round(used * bar)
+            rows.append([(short + " ", "muted"), ("█" * filled, style), ("░" * (bar - filled), "faint"),
+                         (f"{used * 100:4.0f}%", style), (f" {reset:>3}" if reset else "", "faint")])
+    return rows

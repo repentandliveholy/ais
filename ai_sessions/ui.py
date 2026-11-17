@@ -25,7 +25,8 @@ from .adapters import Collector
 from .brand import CLIENT_STYLE, PALETTE, STATUS_STYLE, WORDMARK
 from .model import CLIENTS, LABELS, STATUSES, Session, Project, folder_entries, group_projects, age, canonical, clean, filter_sessions, line, number, parse_query, pretty_path, same_cwd, validate_launch
 from .screen import Screen, clip, width, wrap
-from .usage import Usage, fetch_live_usage, load_usage, max_usage_scroll, render_usage
+from .screen import width as width_of
+from .usage import Usage, fetch_live_usage, load_usage, max_usage_scroll, render_usage, usage_strip_lines
 
 
 @dataclass
@@ -65,10 +66,16 @@ class View:
     usage_project: str | None = None
     pins: set[str] = field(default_factory=set)
     help_scroll: int = 0
+    # Usage survives returning from a CLI, so the strip never starts empty.
+    usage: Usage | None = None
+    usage_live_at: float = 0
+    usage_refreshing: bool = False
 
 
 HISTORY_REFRESH_SECONDS = 10
 USAGE_REFRESH_SECONDS = 60
+# The strip refreshes rarely: each refresh runs the official CLIs.
+STRIP_REFRESH_SECONDS = 300
 RESTART_KEY_SECONDS = .5
 SCROLL_STEP_INTERVAL = .04
 BACKSPACE_KEYS = (curses.KEY_BACKSPACE, "\x7f", "\b")
@@ -141,6 +148,28 @@ def visible_entries(sessions: list[Session], v: View) -> list[Session | Project]
     return pinned_first(filter_sessions(scoped_sessions(sessions, v), v.cwd,
                                         "all" if v.project_path is not None else v.scope,
                                         v.client, v.query, v.children, v.archived, v.pins), v.pins)
+
+
+def draw_usage_strip(screen: Screen, usage: Usage | None, x: int, top: int, bottom: int,
+                     width: int, refreshing: bool = False):
+    for y in range(top, bottom):
+        screen.put(y, x, "│", "faint")
+    cx, cw = x + 2, width - 4
+    title = tr("LIMITS")
+    screen.put(top, cx, title, "accent", bold=True, limit=cw)
+    if refreshing:
+        screen.put(top, cx + width_of(title) + 1, "↻", "cyan")
+    screen.hit(top, x, width, ("tab", "usage"), h=bottom - top)
+    if usage is None or not usage.loaded:
+        screen.put(top + 2, cx, tr("loading…"), "muted", limit=cw)
+        return
+    y = top + 2
+    for parts in usage_strip_lines(usage, cw, time.time()):
+        if y >= bottom - 1:
+            break
+        screen.spans(y, cx, parts, limit=cw)
+        y += 1
+    screen.put(bottom - 1, cx, tr("U — full usage"), "faint", limit=cw)
 
 
 def put_highlighted(screen: Screen, y: int, x: int, text: str, style: str, words: list[str], *,
@@ -348,18 +377,37 @@ def detail_lines(s: Session | Project, maximum: int, home: Path) -> list[tuple[s
     return result
 
 
+STRIP_WIDTH = 27
+STRIP_MIN_COLS = 150
+
+
+def layout(cols: int, view: View) -> tuple[bool, int, int]:
+    """(wide, list width, usage strip width): identical for Projects and Sessions."""
+    wide = cols >= 112 and not view.narrow_detail
+    strip = STRIP_WIDTH if wide and cols >= STRIP_MIN_COLS else 0
+    left = max(54, int((cols - strip) * .52)) if wide else cols - 3
+    return wide, left, strip
+
+
+def detail_width(cols: int, view: View) -> int:
+    wide, left, strip = layout(cols, view)
+    if not wide:
+        return cols - 6
+    return (cols - strip - 1) - (left + 1) - 4 if strip else cols - left - 7
+
+
 def detail_scroll_limit(session: Session | Project | None, view: View, cols: int, rows: int) -> int:
     if session is None or (isinstance(session, Project) and not view.narrow_detail):
         return 0
     header = 5 if rows >= 26 and cols >= 70 else 4
-    wide = cols >= 112 and not view.narrow_detail
-    left_width = cols // 2 if view.tab == "projects" else max(54, int(cols * .55))
-    text_width = cols - left_width - 7 if wide else cols - 6
+    wide = layout(cols, view)[0]
+    text_width = detail_width(cols, view)
     visible_rows = max(1, rows - 4 - (header + 7) - (1 if wide else 0))
     return max(0, len(detail_lines(session, max(4, text_width), view.home)) - visible_rows)
 
 
-def render(sessions: list[Session], v: View, cols: int, rows: int, errors: list[str] | None = None) -> Screen:
+def render(sessions: list[Session], v: View, cols: int, rows: int, errors: list[str] | None = None,
+           usage: Usage | None = None) -> Screen:
     screen = Screen(cols, rows)
     if cols < 44 or rows < 16:
         screen.put(1, 1, "ais · AI Sessions", "accent", bold=True)
@@ -448,7 +496,7 @@ def render(sessions: list[Session], v: View, cols: int, rows: int, errors: list[
     current = filtered[selected] if filtered else None
     v.detail_scroll = max(0, min(v.detail_scroll, detail_scroll_limit(current, v, cols, rows)))
     start, bottom = header + 7, rows - 4
-    left_width = (cols // 2 if v.tab == "projects" else max(54, int(cols * 0.55))) if wide else cols - 3
+    wide, left_width, strip = layout(cols, v)
     title = tr('SESSIONS  {v0}', v0=len(filtered)) + (f" / {len(sessions)}" if len(filtered) != len(sessions) else "")
     if v.tab == "projects":
         title = tr("PROJECTS  {v0}", v0=len(filtered))
@@ -546,7 +594,7 @@ def render(sessions: list[Session], v: View, cols: int, rows: int, errors: list[
         divider = left_width + 1
         for y in range(start - 1, bottom):
             screen.put(y, divider, "│", "faint")
-        dx, dw = divider + 3, cols - divider - 6
+        dx, dw = divider + 3, detail_width(cols, v)
         screen.put(start - 1, dx, tr('DETAILS') + (tr(' · loading…') if v.busy_detail else ""), "accent", bold=True, limit=dw)
         if project:
             for i, (text, style) in enumerate(project_detail_lines(project, dw, v.home)):
@@ -563,6 +611,8 @@ def render(sessions: list[Session], v: View, cols: int, rows: int, errors: list[
             screen.put(bottom - 1, dx, tr('[ ] scroll · D expand · Y copy · F pin'), "muted", limit=dw)
         else:
             screen.put(start + 1, dx, tr('Select a session on the left'), "muted", limit=dw)
+        if strip:
+            draw_usage_strip(screen, usage, cols - strip, start - 1, bottom, strip, v.usage_refreshing)
     screen.rule(rows - 4)
     primary = tr('↑↓ select   Enter resume   Tab directory/all   ←→ client   / search') if cols >= 75 else tr('↑↓ select  Enter run  Tab scope  / search')
     if v.tab == "projects":
@@ -895,7 +945,7 @@ def browse(collector: Collector, view: View) -> Session | tuple[str, str] | None
     executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ais")
     detail_cache: dict[str, Session] = {}
     requested: set[str] = set()
-    usage = Usage()
+    usage = view.usage or Usage()
     usage_requested = False
     usage_refreshing = False
     usage_cancel = threading.Event()
@@ -1037,14 +1087,19 @@ def browse(collector: Collector, view: View) -> Session | tuple[str, str] | None
                     if not usage.live or not view.live_usage:
                         usage = value
                 elif kind == "usage_live":
-                    usage, usage_refreshing, view.message = value, False, ""
+                    usage, usage_refreshing = value, False
+                    if view.tab == "usage":
+                        view.message = ""
                 elif kind == "usage_failure":
-                    usage_refreshing, view.message = False, value
+                    usage_refreshing = False
+                    if view.tab == "usage":
+                        view.message = value
                     if value not in usage.errors:
                         usage.errors.append(value)
                 elif kind == "usage_done":
                     usage_refreshing = False
                     usage_finished_at = time.monotonic()
+                view.usage, view.usage_refreshing = usage, usage_refreshing
                 dirty = True
             filtered = visible_entries(sessions, view)
             view.selected = max(0, min(view.selected, len(filtered) - 1))
@@ -1087,7 +1142,14 @@ def browse(collector: Collector, view: View) -> Session | tuple[str, str] | None
                 last_shape, dirty = (h, w), True
             usage_due = (view.auto_refresh and usage_finished_at is not None and
                          now - usage_finished_at >= USAGE_REFRESH_SECONDS)
-            if (view.tab == "usage" and (not usage_requested or usage_due) and
+            # The strip loads the cached snapshot once, then refreshes live rarely.
+            strip_due = view.tab != "usage" and layout(w, view)[2] > 0 and (
+                not usage.loaded or
+                (view.live_usage and (view.auto_refresh or not view.usage_live_at) and
+                 time.time() - view.usage_live_at >= STRIP_REFRESH_SECONDS))
+            if strip_due and (usage_future is None or usage_future.done()):
+                view.usage_live_at = time.time()
+            if (((view.tab == "usage" and (not usage_requested or usage_due)) or strip_due) and
                     (usage_future is None or usage_future.done())):
                 usage_requested = True
                 usage_refreshing = view.live_usage
@@ -1099,7 +1161,8 @@ def browse(collector: Collector, view: View) -> Session | tuple[str, str] | None
             # away; deferring to the next input timeout adds visible latency.
             elapsed = time.monotonic() - last_render
             if dirty or elapsed > 15:
-                screen = render(sessions, view, w, h, collector.errors)
+                view.usage_refreshing = usage_refreshing
+                screen = render(sessions, view, w, h, collector.errors, usage)
                 if view.tab == "usage":
                     view.usage_scroll = max(0, min(view.usage_scroll, max_usage_scroll(usage, w, h)))
                     screen = render_usage(screen, usage, view.usage_scroll, refreshing=usage_refreshing, message=view.message)

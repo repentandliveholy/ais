@@ -350,7 +350,8 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 launch(session, new_tab=new_tab)
         elif args.snapshot:
-            screen = render(sessions, view, min(400, max(20, args.cols)), min(200, max(10, args.rows)), collector.errors)
+            strip_usage = demo_usage() if args.demo else load_usage(collector)
+            screen = render(sessions, view, min(400, max(20, args.cols)), min(200, max(10, args.rows)), collector.errors, strip_usage)
             if args.usage:
                 screen = render_usage(screen, demo_usage() if args.demo else usage_for_output(collector, cached=args.cached_usage), message=view.message)
             screen.save(args.snapshot)

@@ -106,7 +106,7 @@ Pins and the last CLI chosen in **New session** (also selectable with `1`–`6`)
 
 Search input starts only after `/` or `.`. Other unbound text is ignored. `Enter` finishes editing the query; press `/` or `.` to edit it again.
 
-On wide terminals, details appear on the right. On narrow terminals, open them with `D`. The full wordmark appears when there is enough vertical space.
+On wide terminals, details appear on the right. Projects and Sessions use the same column split. From 150 columns a narrow **LIMITS** strip on the far right shows one compact bar per account and window (5h / week) with the time to reset, plus the DeepSeek balance; it shows the cached snapshot at once and refreshes through the official CLIs every 5 minutes. Click it or press `U` for the full Usage panel. On narrow terminals, open them with `D`. The full wordmark appears when there is enough vertical space.
 
 `R` reloads history, selects the first row and scrolls to the top. Search and filters are preserved. The old list stays visible until all sources finish reloading. Pressing `R` during a background scan queues a refresh without changing the search query. In Usage, `R` also scrolls to the top.
 
