@@ -667,8 +667,10 @@ def fetch_live_usage(collector, cancel: threading.Event | None = None, timeout: 
 
         def per_account(key):
             status, members = identities[key]
-            details = Account("anthropic", key, email=line(status.get("email") or "", 120),
-                              name=line(status.get("orgName") or "", 80),
+            email, org = line(status.get("email") or "", 120), line(status.get("orgName") or "", 80)
+            if email and org.casefold() in (f"{email}'s organization".casefold(), email.casefold()):
+                org = ""  # A personal default organization only repeats the email.
+            details = Account("anthropic", key, email=email, name=org,
                               plan=plan_name(status.get("subscriptionType") or ""),
                               dirs=[pretty_dir(root, collector.home) + ("" if not default else tr(" (default)"))
                                     for root, default in members],
