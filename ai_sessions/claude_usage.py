@@ -125,7 +125,7 @@ def read_claude_usage(binary, env, cwd, cancel: threading.Event, timeout: float)
         if process is not None:
             try:
                 os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
+            except (ProcessLookupError, PermissionError):  # macOS: EPERM for an exited group
                 pass
             process.wait()
         os.close(master)

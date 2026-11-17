@@ -12,6 +12,7 @@ from unittest.mock import patch
 from ai_sessions.cli import demo_sessions
 from ai_sessions.i18n import preferred_language, save_language, set_language, tr
 from ai_sessions.locales import RU
+from ai_sessions.locales_fr import FR
 from ai_sessions.screen import Screen
 from ai_sessions.ui import View, render
 from ai_sessions.usage import Limit, Usage, demo_usage, render_usage
@@ -68,6 +69,12 @@ class LanguageTests(unittest.TestCase):
                           if name is not None)
         for english, russian in RU.items():
             self.assertEqual(placeholders(english), placeholders(russian), english)
+        for english, french in FR.items():
+            self.assertEqual(placeholders(english), placeholders(french), english)
+
+    def test_french_covers_every_russian_string(self):
+        self.assertEqual(set(RU) - set(FR), set())
+        self.assertEqual(set(FR) - set(RU), set())
 
     def test_cli_language_help_and_saved_preference(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -78,6 +85,7 @@ class LanguageTests(unittest.TestCase):
             self.assertIn("Каталог проекта", run("--lang", "ru", "--help"))
             self.assertIn("sessions", run("--lang", "en", "--demo", "--list"))
             self.assertIn("сессий", run("--lang", "ru", "--demo", "--list"))
+            self.assertIn("Dossier du projet", run("--lang", "fr", "--help"))
             self.assertIn("Каталог проекта", run("--help"))
 
 

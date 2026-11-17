@@ -545,7 +545,12 @@ class TerminalTests(unittest.TestCase):
         self.until("Текущий каталог")
         self.send("l")
         self.until("ЯЗЫК")
-        self.send("\x1bOA\n")
+        self.send("\x1bOB\n")  # Down from Russian lands on French
+        self.until("Dossier courant")
+        self.assertEqual(json.loads(path.read_text())["language"], "fr")
+        self.send("l")
+        self.until("LANGUE")
+        self.send("\x1bOA\x1bOA\n")  # Up twice: French -> Russian -> English
         self.until("Current directory")
         self.assertEqual(json.loads(path.read_text())["language"], "en")
         self.send("q")

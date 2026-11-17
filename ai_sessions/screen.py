@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .brand import PALETTE
+from .i18n import language
 from .model import clean
 
 
@@ -158,7 +159,7 @@ class Screen:
         if path.suffix == ".svg":
             path.write_text(self.svg())
         elif path.suffix == ".html":
-            path.write_text('<!doctype html><html lang="ru"><meta charset="utf-8"><title>ais · AI Sessions</title><body style="margin:0;background:#0b0e16;display:grid;place-items:center;min-height:100vh">' + self.svg() + "</body></html>")
+            path.write_text('<!doctype html><html lang="' + language() + '"><meta charset="utf-8"><title>ais · AI Sessions</title><body style="margin:0;background:#0b0e16;display:grid;place-items:center;min-height:100vh">' + self.svg() + "</body></html>")
         else:
             path.write_text(self.plain() + "\n")
         path.chmod(0o600)

@@ -445,7 +445,7 @@ RU.update({
     'first / last': 'первая / последняя',
     'git branch · directory (b: in:)': 'ветка git · каталог (b: in:)',
     'is:child · is:archived': 'is:child · is:archived',
-    'language: English / Russian': 'язык: English / Русский',
+    'language: English / Russian / French': 'язык: English / Русский / Français',
     'model or provider · m:': 'модель или провайдер · m:',
     'must contain / must not contain': 'содержит / не содержит',
     'new session in current directory': 'новая сессия в текущем каталоге',

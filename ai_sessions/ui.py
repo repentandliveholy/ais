@@ -657,7 +657,7 @@ HELP_SECTIONS = (
         ("T", "project tree on / off"),
         ("D  [ ]", "expand details · scroll"),
         ("C  A", "child sessions · Codex archive"),
-        ("L", "language: English / Russian"),
+        ("L", "language: English / Russian / French"),
         ("R  rr", "refresh · restart ais"),
         ("Q  Ctrl+C", "quit"),
     )),
@@ -741,7 +741,7 @@ def draw_modal(screen: Screen, v: View, current: Session | None, errors: list[st
     if v.modal == "language":
         lines = [(tr("LANGUAGE"), "accent"), ("", "text"),
                  (tr("↑↓ choose · Enter save · Esc cancel"), "muted"), ("", "text")]
-        for i, label in enumerate(("English", "Русский")):
+        for i, label in enumerate(("English", "Русский", "Français")):
             options[len(lines)] = ("lang", i)
             lines.append((("› " if i == v.language_index else "  ") + label, "text"))
     else:

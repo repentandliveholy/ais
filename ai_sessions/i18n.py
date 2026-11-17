@@ -7,9 +7,11 @@ import tempfile
 from pathlib import Path
 
 from .locales import RU
+from .locales_fr import FR
 
 
-LANGUAGES = ("en", "ru")
+LANGUAGES = ("en", "ru", "fr")
+TRANSLATIONS = {"ru": RU, "fr": FR}
 _language = "en"
 
 
@@ -25,7 +27,7 @@ def set_language(value: str):
 
 
 def tr(message: str, **values) -> str:
-    text = RU.get(message, message) if _language == "ru" else message
+    text = TRANSLATIONS.get(_language, {}).get(message, message)
     return text.format(**values) if values else text
 
 

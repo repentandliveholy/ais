@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .i18n import preferred_language, save_language, set_language, tr
+from .i18n import LANGUAGES, preferred_language, save_language, set_language, tr
 
 import argparse
 import json
@@ -27,7 +27,7 @@ from .usage import demo_usage, fetch_live_usage, load_usage, render_usage, reset
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ais", description=tr('AI Sessions · all conversations, one entry point. Browse local AI CLI history and resume sessions.'))
     p.add_argument("--version", action="version", version=f"ais {__version__}")
-    p.add_argument("--lang", choices=("en", "ru"), help=tr("Interface language (saved for future launches)"))
+    p.add_argument("--lang", choices=LANGUAGES, help=tr("Interface language (saved for future launches)"))
     p.add_argument("-C", "--cwd", type=Path, default=Path.cwd(), help=tr('Project directory (default: cwd)'))
     p.add_argument("-a", "--all", action="store_true", help=tr('History from all projects'))
     p.add_argument("--client", choices=CLIENTS, help=tr('Filter by client'))
@@ -260,7 +260,7 @@ def usage_for_output(collector: Collector, *, cached: bool = False):
 def main(argv: list[str] | None = None) -> int:
     # Select the language before building argparse so --help is localized too.
     language_args = argparse.ArgumentParser(add_help=False)
-    language_args.add_argument("--lang", choices=("en", "ru"))
+    language_args.add_argument("--lang", choices=LANGUAGES)
     selected_language, _ = language_args.parse_known_args(argv)
     set_language(selected_language.lang or preferred_language())
     args = parser().parse_args(argv)

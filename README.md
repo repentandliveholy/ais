@@ -41,13 +41,14 @@ New project tabs contain the main session on the left and two ordinary project t
 
 ## Language
 
-**English is the default.** Press **`L`** in Sessions or Usage, choose **English / Русский**, then press `Enter`. `Esc` cancels. The choice is saved in `${XDG_CONFIG_HOME:-~/.config}/ai-sessions/settings.json`.
+**English is the default.** Press **`L`** in Sessions or Usage, choose **English / Русский / Français**, then press `Enter`. `Esc` cancels. The choice is saved in `${XDG_CONFIG_HOME:-~/.config}/ai-sessions/settings.json`.
 
 You can also select and save the language from the command line:
 
 ```sh
 ais --lang en
 ais --lang ru
+ais --lang fr
 ```
 
 Help, controls, statuses, details, errors and Usage labels follow the selected language. Conversation content and provider-supplied labels retain their original text.
