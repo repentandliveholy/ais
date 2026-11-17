@@ -2,7 +2,7 @@
 name = "ais-shell"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"
 description = "ais · AI Sessions — a native workspace for AI coding CLIs (Claude Code, Codex, Gemini, agy, OMP, Pi)"
 license = "MIT"
 readme = "README.md"

@@ -136,6 +136,10 @@ Limits are grouped **per account**, not per CLI. Each block shows the account em
 
 Extra stores are discovered automatically: every `~/.claude-*` folder with `projects/` or `.claude.json` and every `~/.codex-*` folder with `sessions/` or `auth.json` (for example `CLAUDE_CONFIG_DIR=~/.claude-work claude`). Their sessions also appear in the browser, labelled with the folder suffix as a profile (`profile:work` in search). For Claude, ais asks `claude auth status --json` in each store: two different logins become two separate blocks; several folders signed in to the same account are merged into one block that says so. `/usage` runs once per account from a folder that config already trusts. Codex identity comes from the app-server `account/read` request.
 
+agy has no account command, so ais reads the signed-in email and auth method from the agy log written by that same `/usage` run (older logs are never used).
+
+**DeepSeek API balance.** DeepSeek has no CLI, so this is the one direct HTTPS request ais makes: `GET https://api.deepseek.com/user/balance`, only when a key is configured. Set `DEEPSEEK_API_KEY`, or run `ais --set-deepseek-key` (hidden input, saved with mode `600` to `~/.config/ai-sessions/deepseek.key`; empty input removes it). Usage then shows the total, topped-up and granted balance per currency and warns when it is exhausted. The key is never displayed (only `key …abcd`), logged or included in errors.
+
 Opening the panel starts background requests through installed official CLIs only:
 
 - **Codex:** `codex app-server`, using the documented `initialize` / `initialized` handshake and `account/rateLimits/read`. Displays the quota windows and multiple buckets reported by the CLI, without duplicating its legacy single-bucket view. No model turn is started.

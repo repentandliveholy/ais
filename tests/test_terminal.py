@@ -155,6 +155,11 @@ class TerminalTests(unittest.TestCase):
         self.until("No matching sessions yet")
         self.send("0")
         self.until("PTY test session")
+        if sys.platform != "darwin":
+            # Linux ncurses decodes mouse reports itself; covered by unit tests.
+            self.send("q")
+            self.assertEqual(self.exit_code(), 0)
+            return
         click = "\x1b[<0;10;13M\x1b[<0;10;13m"
         self.send(click + click)  # Double-click the first row (1-based SGR cell).
         self.until("DISPATCH=")
@@ -189,6 +194,9 @@ class TerminalTests(unittest.TestCase):
         self.until("1 sessions")
         self.send("\n")  # enter the parent folder
         self.until("PTY test session")  # folder view lists its own session
+        # The same title is already visible in the parent's detail pane, so
+        # give the folder view one frame before the next Enter.
+        time.sleep(.4)
         self.send("\n")  # enter the child project
         self.until("CHILD SESSION")
         self.send("\x7f")  # back to the parent folder

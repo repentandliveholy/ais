@@ -4,7 +4,7 @@ Thank you for contributing!
 
 ## Prerequisites
 
-- Rust toolchain `1.88` or newer (`rust-version = "1.88"`, Rust 2024 edition).
+- Rust toolchain `1.89` or newer (`rust-version = "1.89"`, Rust 2024 edition).
 - On Linux: `libxkbcommon-dev`, `libwayland-dev` / X11 development headers, `libgl-dev`, plus runtime tools `zenity`, `notify-send`, and `xdg-open`.
 
 ## Checks

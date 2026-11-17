@@ -70,6 +70,7 @@ class WarpTests(unittest.TestCase):
                 open_tab(['/bin/true'], temp, {}, scheme='warposs')
             self.assertEqual(read_state(registry_path(temp, 'warposs')), {})
 
+    @unittest.skipIf(sys.version_info < (3, 11), "tomllib is Python 3.11+")
     def test_worker_executes_exact_argv_cwd_title_and_reuses_tab(self):
         with tempfile.TemporaryDirectory() as temp, patch('ai_sessions.warp.tempfile.gettempdir', return_value=temp), patch('ai_sessions.warp.tab_config_dir', return_value=Path(temp) / 'configs'):
             cwd = Path(temp) / "project spaces ' $()"

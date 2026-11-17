@@ -39,6 +39,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--doctor", action="store_true", help=tr('Diagnose history sources and installed CLIs'))
     p.add_argument("--sessions", action="store_true", help=tr('Open the Sessions tab instead of Projects'))
     p.add_argument("--usage", action="store_true", help=tr('Open provider usage limits: 5h / week'))
+    p.add_argument("--set-deepseek-key", action="store_true",
+                   help=tr("Save a DeepSeek API key (hidden input) to show its balance in Usage"))
     p.add_argument("--cached-usage", action="store_true", help=tr('Show only cached usage without launching official CLIs'))
     p.add_argument("--no-auto-refresh", action="store_true", help=tr('Disable periodic history and usage refresh'))
     p.add_argument("--resume", metavar="ID", help=tr('Resume by session ID or unique prefix'))
@@ -267,6 +269,18 @@ def main(argv: list[str] | None = None) -> int:
             save_language(args.lang)
         except OSError as exc:
             print(tr("Could not save language: {error}", error=line(exc)), file=sys.stderr)
+    if args.set_deepseek_key:
+        import getpass
+        from .usage import save_deepseek_key
+        key = getpass.getpass(tr("DeepSeek API key (input hidden, empty to remove): ")).strip()
+        if not key:
+            from .usage import deepseek_key_path
+            deepseek_key_path().unlink(missing_ok=True)
+            print(tr("DeepSeek key removed"))
+            return 0
+        path = save_deepseek_key(key)
+        print(tr("Saved to {path} (mode 600). Check it with: ais --usage", path=pretty_path(str(path))))
+        return 0
     cwd, home = canonical(str(args.cwd)), args.home.expanduser().resolve()
     if not Path(cwd).is_dir():
         parser().error(tr('Directory does not exist: {v0}', v0=cwd))

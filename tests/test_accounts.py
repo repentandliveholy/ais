@@ -106,3 +106,54 @@ os.read(0, 1)
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AgyAccountTests(unittest.TestCase):
+    def test_identity_comes_only_from_logs_of_this_run(self):
+        from ai_sessions.usage import agy_identity
+        import os
+        with tempfile.TemporaryDirectory() as temp:
+            log = Path(temp) / "log"
+            log.mkdir()
+            old = log / "cli-old.log"
+            old.write_text("server_oauth.go:221] applyAuthResult: email=old@example.com, authMethod=consumer, quotaProject=\n")
+            os.utime(old, (1000, 1000))
+            self.assertEqual(agy_identity(Path(temp), time.time()), ("", ""))
+            (log / "cli-new.log").write_text("x\nserver_oauth.go:221] applyAuthResult: email=new@example.com, authMethod=consumer, quotaProject=\n")
+            self.assertEqual(agy_identity(Path(temp), time.time()), ("new@example.com", "consumer"))
+
+
+class DeepSeekTests(unittest.TestCase):
+    def test_balance_parsing_and_rendering(self):
+        from ai_sessions.usage import Usage, parse_deepseek_balance, usage_content
+        payload = {"is_available": True, "balance_infos": [
+            {"currency": "CNY", "total_balance": "110.00", "granted_balance": "10.00", "topped_up_balance": "100.00"},
+            {"currency": "USD", "total_balance": "0.00", "granted_balance": "0.00", "topped_up_balance": "0.00"}]}
+        limits = parse_deepseek_balance(payload, time.time())
+        self.assertEqual([l.status for l in limits], ["balance", "balance-empty"])
+        text = "\n".join(t for t, _ in usage_content(Usage(limits, loaded=True), 140, time.time()))
+        self.assertIn("balance ¥110.00", text)
+        self.assertIn("topped up ¥100.00", text)
+        self.assertIn("balance exhausted", text)
+        with self.assertRaises(ValueError):
+            parse_deepseek_balance({"error": "x"}, 0)
+
+    def test_key_source_and_errors_never_echo_the_key(self):
+        import os
+        import urllib.error
+        from ai_sessions.usage import deepseek_key, fetch_deepseek_balance, save_deepseek_key
+        import threading
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"XDG_CONFIG_HOME": temp}, clear=False):
+            os.environ.pop("DEEPSEEK_API_KEY", None)
+            self.assertEqual(deepseek_key(), "")
+            path = save_deepseek_key("sk-secret-1234")
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(deepseek_key(), "sk-secret-1234")
+            with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "sk-env"}):
+                self.assertEqual(deepseek_key(), "sk-env")
+            error = urllib.error.HTTPError("u", 401, "no", {}, None)
+            with patch("urllib.request.urlopen", side_effect=error):
+                with self.assertRaises(ValueError) as caught:
+                    fetch_deepseek_balance("sk-secret-1234", threading.Event(), 5)
+            self.assertIn("401", str(caught.exception))
+            self.assertNotIn("secret", str(caught.exception))

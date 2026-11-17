@@ -29,8 +29,101 @@ from .screen import wrap as _wrap
 
 
 PROVIDERS = {"anthropic": "Anthropic / Claude", "openai-codex": "OpenAI / Codex",
-             "google-antigravity": "Google / agy"}
-CLI_SOURCES = {"anthropic": "Claude CLI", "openai-codex": "Codex CLI", "google-antigravity": "agy CLI"}
+             "google-antigravity": "Google / agy", "deepseek": "DeepSeek API"}
+CLI_SOURCES = {"anthropic": "Claude CLI", "openai-codex": "Codex CLI", "google-antigravity": "agy CLI",
+               "deepseek": "DeepSeek API"}
+DEEPSEEK_BALANCE_URL = "https://api.deepseek.com/user/balance"
+CURRENCY = {"CNY": "¥", "USD": "$"}
+
+
+def deepseek_key_path() -> Path:
+    from .i18n import settings_path
+    return settings_path().parent / "deepseek.key"
+
+
+def deepseek_key() -> str:
+    """DEEPSEEK_API_KEY, else the private key file written by --set-deepseek-key."""
+    key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+    if key:
+        return key
+    try:
+        path = deepseek_key_path()
+        if path.stat().st_size > 4096:
+            return ""
+        return path.read_text().strip()
+    except OSError:
+        return ""
+
+
+def save_deepseek_key(key: str) -> Path:
+    path = deepseek_key_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w") as stream:
+        stream.write(key.strip() + "\n")
+    os.chmod(path, 0o600)
+    return path
+
+
+def money(amount: str, currency: str) -> str:
+    try:
+        value = f"{float(amount):,.2f}"
+    except (TypeError, ValueError):
+        value = line(amount, 20)
+    symbol = CURRENCY.get(currency)
+    return f"{symbol}{value}" if symbol else f"{value} {line(currency, 8)}"
+
+
+def parse_deepseek_balance(payload: object, updated: float) -> list["Limit"]:
+    """Documented /user/balance body: is_available + balance_infos[]."""
+    if not isinstance(payload, dict) or not isinstance(payload.get("balance_infos"), list):
+        raise ValueError(tr('Unsupported API response'))
+    limits = []
+    for info in payload["balance_infos"]:
+        if not isinstance(info, dict):
+            raise ValueError(tr('Unsupported API response'))
+        currency = line(info.get("currency") or "", 8)
+        total = money(info.get("total_balance"), currency)
+        parts = [tr("topped up {amount}", amount=money(info.get("topped_up_balance"), currency)),
+                 tr("granted {amount}", amount=money(info.get("granted_balance"), currency))]
+        label = tr("balance {total}", total=total) + "  ·  " + "  ·  ".join(parts)
+        try:
+            empty = float(info.get("total_balance")) <= 0
+        except (TypeError, ValueError):
+            empty = False
+        limits.append(Limit("deepseek", "API", label, currency or "—", None, 0, updated,
+                            "DeepSeek API · live", status="balance-empty" if empty else "balance", id=currency))
+    if not limits:
+        raise ValueError(tr('API did not report a balance'))
+    if payload.get("is_available") is False:
+        limits[0].status = "balance-empty"
+    return limits
+
+
+def fetch_deepseek_balance(key: str, cancel, timeout: float) -> list["Limit"]:
+    import urllib.error
+    import urllib.request
+    if cancel.is_set():
+        raise CancelledError()
+    request = urllib.request.Request(DEEPSEEK_BALANCE_URL, headers={
+        "Authorization": "Bearer " + key, "Accept": "application/json", "User-Agent": "ais"})
+    try:
+        with urllib.request.urlopen(request, timeout=min(timeout, 15)) as response:
+            body = response.read(256 * 1024)
+    except urllib.error.HTTPError as exc:
+        # Never echo the response body or the key; status codes are enough.
+        if exc.code in (401, 403):
+            raise ValueError(tr('DeepSeek rejected the API key (HTTP {code})', code=exc.code)) from None
+        raise ValueError(tr('DeepSeek API error (HTTP {code})', code=exc.code)) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ValueError(tr('DeepSeek API is unreachable')) from None
+    if cancel.is_set():
+        raise CancelledError()
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        raise ValueError(tr('Unsupported API response')) from None
+    return parse_deepseek_balance(payload, time.time())
 
 
 @dataclass
@@ -111,7 +204,7 @@ def plan_name(value) -> str:
     return PLAN_NAMES.get(value.casefold(), value[:1].upper() + value[1:])
 
 
-def local_activity(folder: Path, now: float | None = None) -> tuple[int, int]:
+def local_activity(folder: Path, now: float | None = None, suffix: str = ".jsonl") -> tuple[int, int]:
     """Session files touched in the last 5 hours / 7 days (mtime only)."""
     now = now or time.time()
     recent = week = 0
@@ -120,7 +213,7 @@ def local_activity(folder: Path, now: float | None = None) -> tuple[int, int]:
     for root, dirs, files in os.walk(folder):
         dirs[:] = [d for d in dirs if d != "subagents"]
         for name in files:
-            if not name.endswith(".jsonl") or name.startswith("agent-"):
+            if not name.endswith(suffix) or name.startswith("agent-"):
                 continue
             try:
                 age = now - os.stat(os.path.join(root, name)).st_mtime
@@ -592,6 +685,33 @@ def trusted_dir(config: Path, fallback: Path) -> Path:
     return fallback
 
 
+_AGY_AUTH = re.compile(r"applyAuthResult: email=([^,\s]+), authMethod=(\w+)")
+AGY_METHODS = {"consumer": "Google account", "enterprise": "Workspace", "vertex": "Vertex AI"}
+
+
+def agy_identity(store: Path, started: float) -> tuple[str, str]:
+    """(email, auth method) from the agy log written by this /usage run.
+
+    agy has no account command; its own log records the signed-in OAuth user.
+    Only logs created by the run are read, so an old login is never reused.
+    """
+    try:
+        logs = [p for p in (store / "log").glob("cli-*.log") if p.stat().st_mtime >= started - 2]
+    except OSError:
+        return "", ""
+    for path in sorted(logs, key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            with path.open("rb") as stream:
+                text = stream.read(2 * 1024 * 1024).decode("utf-8", errors="replace")
+        except OSError:
+            continue
+        found = _AGY_AUTH.findall(text)
+        if found:
+            email, method = found[-1]
+            return line(email, 120), method
+    return "", ""
+
+
 def account_key(*parts: str) -> str:
     return anonymous_account("|".join(p for p in parts if p)) if any(parts) else "CLI"
 
@@ -704,6 +824,12 @@ def fetch_live_usage(collector, cancel: threading.Event | None = None, timeout: 
         return limits, accounts
 
     def fetch(client):
+        if client == "deepseek":
+            key = deepseek_key()
+            limits = fetch_deepseek_balance(key, cancel, timeout)
+            for limit in limits:
+                limit.account = "key …" + key[-4:]
+            return limits, []
         binary = shutil.which(client)
         if not binary:
             raise ValueError(tr('Official CLI not installed'))
@@ -714,13 +840,25 @@ def fetch_live_usage(collector, cancel: threading.Event | None = None, timeout: 
         # agy has no documented flag/environment variable for alternate stores.
         if collector.root("agy") != [collector.home / ".gemini/antigravity-cli"]:
             raise ValueError(tr('agy CLI does not support an alternate usage store'))
+        store = collector.home / ".gemini/antigravity-cli"
+        started = time.time()
         result = _cli_output([binary, "-p", "/usage"], base_env(), collector.home, cancel, timeout)
-        return parse_agy_usage(result, time.time()), []
+        limits = parse_agy_usage(result, time.time())
+        email, method = agy_identity(store, started)
+        key = account_key(email) if email else "CLI"
+        for limit in limits:
+            limit.account = key
+        details = Account("google-antigravity", key, email=email,
+                          plan=AGY_METHODS.get(method, method), dirs=[pretty_dir(store, collector.home)])
+        details.sessions_5h, details.sessions_7d = local_activity(store / "conversations", suffix=".db")
+        return limits, [details]
 
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        pending = {client: pool.submit(fetch, client) for client in ("claude", "codex", "agy")}
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        clients = ("claude", "codex", "agy", *(("deepseek",) if deepseek_key() else ()))
+        pending = {client: pool.submit(fetch, client) for client in clients}
         for client, future in pending.items():
-            provider = {"claude": "anthropic", "codex": "openai-codex", "agy": "google-antigravity"}[client]
+            provider = {"claude": "anthropic", "codex": "openai-codex", "agy": "google-antigravity",
+                        "deepseek": "deepseek"}[client]
             try:
                 value, accounts = future.result()
                 usage.limits = [r for r in usage.limits if r.provider != provider]
@@ -832,6 +970,12 @@ def usage_content(usage: Usage, cols: int, now: float) -> list[tuple[str, str]]:
             previous = group
         if r.status == "unavailable":
             content.extend((text, "amber") for text in wrap(tr(r.label), cols - 4))
+            continue
+        if r.status in ("balance", "balance-empty"):
+            empty = r.status == "balance-empty"
+            content.extend((text, "red" if empty else "green") for text in wrap(f"  {r.window:6} " + r.label, cols - 4))
+            if empty:
+                content.append(("  ⚠ " + tr("balance exhausted · top up to keep using the API"), "red"))
             continue
         expired = bool(r.reset and r.reset <= now)
         stale = now - r.updated > 3600 or expired

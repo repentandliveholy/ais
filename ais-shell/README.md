@@ -13,7 +13,7 @@ reads the same local histories. No Electron, no account: one ~6 MB binary.
 
 ## Install
 
-Requires a Rust toolchain (**1.88+** on macOS 11.0+ or Linux; Linux support is
+Requires a Rust toolchain (**1.89+** on macOS 11.0+ or Linux; Linux support is
 currently experimental).
 
 ```sh

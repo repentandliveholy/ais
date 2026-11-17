@@ -490,3 +490,20 @@ RU.update({
     '{h}h {m}m': '{h} ч {m} мин',
     '{m}m': '{m} мин',
 })
+
+# DeepSeek API balance.
+RU.update({
+    'API did not report a balance': 'API не сообщил баланс',
+    'DeepSeek API error (HTTP {code})': 'Ошибка DeepSeek API (HTTP {code})',
+    'DeepSeek API is unreachable': 'DeepSeek API недоступен',
+    'DeepSeek API key (input hidden, empty to remove): ': 'API-ключ DeepSeek (ввод скрыт, пусто — удалить): ',
+    'DeepSeek key removed': 'Ключ DeepSeek удалён',
+    'DeepSeek rejected the API key (HTTP {code})': 'DeepSeek отклонил API-ключ (HTTP {code})',
+    'Save a DeepSeek API key (hidden input) to show its balance in Usage': 'Сохранить API-ключ DeepSeek (скрытый ввод), чтобы видеть баланс в Usage',
+    'Saved to {path} (mode 600). Check it with: ais --usage': 'Сохранено в {path} (права 600). Проверка: ais --usage',
+    'Unsupported API response': 'Неподдерживаемый ответ API',
+    'balance exhausted · top up to keep using the API': 'баланс исчерпан · пополните, чтобы пользоваться API',
+    'balance {total}': 'баланс {total}',
+    'granted {amount}': 'бонусы {amount}',
+    'topped up {amount}': 'пополнено {amount}',
+})
