@@ -1,6 +1,6 @@
 [package]
 name = "ais-gui"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 rust-version = "1.89"
 description = "ais · AI Sessions — native desktop workspace for AI coding CLIs (Claude Code, Codex, Gemini, agy, OMP, Pi)"
@@ -32,6 +32,9 @@ ureq = { version = "2.12", default-features = false, features = ["tls"] }
 [target.'cfg(windows)'.dependencies]
 self-replace = "1.5"
 windows-sys = { version = "0.59", features = ["Win32_System_Console", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+
+[build-dependencies]
+tauri-winres = "0.3"
 
 [profile.release]
 lto = "thin"

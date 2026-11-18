@@ -61,6 +61,14 @@ fn main() -> eframe::Result<()> {
             }
         }
     }
+    if std::env::args().any(|arg| arg == "--install-desktop") {
+        attach_parent_console();
+        if let Err(error) = install_desktop_entry() {
+            eprintln!("ais install-desktop failed: {error}");
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
     let no_update_check = std::env::args().any(|arg| arg == "--no-update-check");
 
     import_login_env();
@@ -133,7 +141,7 @@ fn check_args(args: impl Iterator<Item = String>) -> Result<(), String> {
                 Some(id) => return Err(format!("unknown CLI for --run: {id}")),
                 None => return Err("--run needs a CLI name".into()),
             },
-            "--update" | "--no-update-check" => {}
+            "--update" | "--no-update-check" | "--install-desktop" => {}
             // macOS passes a process serial number to apps opened from Finder.
             flag if flag.starts_with("-psn_") => {}
             flag if flag.starts_with('-') => return Err(format!("unknown option: {flag}")),
@@ -224,6 +232,53 @@ fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|window| window == needle)
 }
 
+#[cfg(target_os = "linux")]
+fn install_desktop_entry() -> Result<(), String> {
+    use std::path::PathBuf;
+    let data_home = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .unwrap_or_else(|| cli::home_dir().join(".local/share"));
+    let icon_dir = data_home.join("icons/hicolor/256x256/apps");
+    let apps_dir = data_home.join("applications");
+    std::fs::create_dir_all(&icon_dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&apps_dir).map_err(|e| e.to_string())?;
+
+    let icon_path = icon_dir.join("ais.png");
+    std::fs::write(&icon_path, include_bytes!("../assets/icon-256.png")).map_err(|e| e.to_string())?;
+
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe_escaped = exe.to_string_lossy().replace('\\', "\\\\").replace('"', "\\\"");
+    let desktop = format!(
+        "[Desktop Entry]\n\
+         Type=Application\n\
+         Name={title}\n\
+         Comment=Native desktop workspace for AI coding CLIs\n\
+         Exec=\"{exe_escaped}\" %F\n\
+         Icon=ais\n\
+         Terminal=false\n\
+         Categories=Development;Utility;TerminalEmulator;\n\
+         StartupWMClass=ais\n",
+        title = app::APP_TITLE
+    );
+    std::fs::write(apps_dir.join("ais.desktop"), desktop).map_err(|e| e.to_string())?;
+
+    let _ = std::process::Command::new("gtk-update-icon-cache")
+        .arg("-f")
+        .arg("-t")
+        .arg(data_home.join("icons/hicolor"))
+        .status();
+    let _ = std::process::Command::new("update-desktop-database")
+        .arg(&apps_dir)
+        .status();
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn install_desktop_entry() -> Result<(), String> {
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,9 +288,17 @@ mod tests {
         assert!(check_args(["/tmp".into(), "--run".into(), "claude".into()].into_iter()).is_ok());
         assert!(check_args(["--update".into()].into_iter()).is_ok());
         assert!(check_args(["--no-update-check".into()].into_iter()).is_ok());
+        assert!(check_args(["--install-desktop".into()].into_iter()).is_ok());
         assert!(check_args(["-psn_0_12345".into()].into_iter()).is_ok());
         assert!(check_args(["--run".into()].into_iter()).is_err());
         assert!(check_args(["--run".into(), "bogus".into()].into_iter()).is_err());
         assert!(check_args(["--bogus".into()].into_iter()).is_err());
+    }
+
+    #[test]
+    fn embedded_window_icon_decodes() {
+        let icon = eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon-256.png")).unwrap();
+        assert_eq!((icon.width, icon.height), (256, 256));
+        assert_eq!(icon.rgba.len(), 256 * 256 * 4);
     }
 }

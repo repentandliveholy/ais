@@ -1061,12 +1061,30 @@ impl AisApp {
         }
 
         if response.hovered() {
-            let delta = ui.input(|i| i.raw_scroll_delta.y);
-            if delta.abs() > 0.0 {
-                let lines = pane.accumulate_scroll(delta / metrics.cell.y);
+            let cell_h = metrics.cell.y;
+            let page_rows = (inner.height() / cell_h).max(1.0);
+            let wheel_lines = crate::widgets::wheel_scroll_lines();
+            let scroll_delta_lines = ui.input(|i| {
+                i.events
+                    .iter()
+                    .filter_map(|event| match event {
+                        egui::Event::MouseWheel { unit, delta, modifiers } => Some(wheel_delta_to_lines(
+                            *unit,
+                            *delta,
+                            *modifiers,
+                            cell_h,
+                            page_rows,
+                            wheel_lines,
+                        )),
+                        _ => None,
+                    })
+                    .sum::<f32>()
+            });
+            if scroll_delta_lines.abs() > 0.0 {
+                let lines = pane.accumulate_scroll(scroll_delta_lines);
                 if lines != 0 {
                     let up = lines > 0;
-                    let count = lines.unsigned_abs().min(12) as usize;
+                    let count = lines.unsigned_abs().min(24) as usize;
                     if mouse_mode {
                         if let Some(pos) = pointer {
                             let (row, col, _) = cell_at(pos);
@@ -1641,6 +1659,30 @@ impl AisApp {
     }
 }
 
+/// Converts one `MouseWheel` event into fractional terminal rows.
+fn wheel_delta_to_lines(
+    unit: egui::MouseWheelUnit,
+    delta: Vec2,
+    modifiers: Modifiers,
+    cell_height: f32,
+    page_rows: f32,
+    wheel_lines: f32,
+) -> f32 {
+    if modifiers.ctrl || modifiers.mac_cmd || modifiers.command {
+        return 0.0;
+    }
+    let y = if modifiers.shift && delta.y == 0.0 {
+        delta.x
+    } else {
+        delta.y
+    };
+    match unit {
+        egui::MouseWheelUnit::Point => y / cell_height.max(1.0),
+        egui::MouseWheelUnit::Line => y * wheel_lines,
+        egui::MouseWheelUnit::Page => y * page_rows.max(1.0),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1671,5 +1713,44 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn wheel_events_convert_to_terminal_lines() {
+        let none = Modifiers::NONE;
+        // Mouse-wheel notch on Windows/Linux (`LineDelta(0, 1)`) scrolls `wheel_lines` rows regardless of font height.
+        assert_eq!(
+            wheel_delta_to_lines(egui::MouseWheelUnit::Line, Vec2::new(0.0, 1.0), none, 24.0, 30.0, 3.0),
+            3.0
+        );
+        // Trackpad pixel delta tracks 1:1 with cell height.
+        assert_eq!(
+            wheel_delta_to_lines(
+                egui::MouseWheelUnit::Point,
+                Vec2::new(0.0, -36.0),
+                none,
+                18.0,
+                30.0,
+                3.0
+            ),
+            -2.0
+        );
+        // Page delta scrolls the visible page height.
+        assert_eq!(
+            wheel_delta_to_lines(egui::MouseWheelUnit::Page, Vec2::new(0.0, 1.0), none, 18.0, 28.0, 3.0),
+            28.0
+        );
+        // Zoom modifiers do not scroll the terminal.
+        assert_eq!(
+            wheel_delta_to_lines(
+                egui::MouseWheelUnit::Line,
+                Vec2::new(0.0, 1.0),
+                Modifiers::COMMAND,
+                18.0,
+                30.0,
+                3.0
+            ),
+            0.0
+        );
     }
 }

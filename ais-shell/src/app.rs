@@ -569,7 +569,12 @@ impl AisApp {
             log::warn(&warning);
             app.notice(NoticeKind::Error, warning);
         }
-        cc.egui_ctx.options_mut(|options| options.zoom_with_keyboard = false);
+        cc.egui_ctx.options_mut(|options| {
+            options.zoom_with_keyboard = false;
+            // egui defaults line_scroll_speed to 40pt per LineDelta notch, which feels
+            // sluggish on Windows (1 wheel detent = LineDelta 1.0).
+            options.line_scroll_speed = (crate::widgets::wheel_scroll_lines() * 36.0).max(96.0);
+        });
         app.configure_fonts(&cc.egui_ctx);
         app.configure_style(&cc.egui_ctx);
         for path in app.settings.open_spaces.clone() {

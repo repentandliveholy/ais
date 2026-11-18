@@ -80,6 +80,9 @@ say "Installed $("$DIR/ais" --version) to $DIR/ais"
 
 if verify_and_install "$gui_asset" "$DIR/ais-gui"; then
   say "Installed $("$DIR/ais-gui" --version) to $DIR/ais-gui"
+  if [ "$os" = unknown-linux-gnu ]; then
+    "$DIR/ais-gui" --install-desktop >/dev/null 2>&1 || true
+  fi
 else
   say "Note: prebuilt GUI binary ($gui_asset) is not available for $gui_target; use ais (CLI) or build from ais-shell/."
 fi

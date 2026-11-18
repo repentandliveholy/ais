@@ -54,7 +54,9 @@ try {
     if ($Programs) {
         $Shell = New-Object -ComObject WScript.Shell
         $Shortcut = $Shell.CreateShortcut((Join-Path $Programs 'ais.lnk'))
-        $Shortcut.TargetPath = Join-Path $Dir 'ais-gui.exe'
+        $GuiExe = Join-Path $Dir 'ais-gui.exe'
+        $Shortcut.TargetPath = $GuiExe
+        $Shortcut.IconLocation = "$GuiExe,0"
         $Shortcut.WorkingDirectory = $env:USERPROFILE
         $Shortcut.Description = 'ais · AI Sessions'
         $Shortcut.Save()

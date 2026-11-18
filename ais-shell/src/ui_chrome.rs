@@ -50,7 +50,7 @@ impl AisApp {
                         window_buttons(ui, &palette, self.window_focused);
                         ui.add_space(10.0);
                     }
-                    let (mark, _) = ui.allocate_exact_size(Vec2::new(22.0, 22.0), Sense::hover());
+                    let (mark, _) = ui.allocate_exact_size(Vec2::new(24.0, 24.0), Sense::hover());
                     paint_logo(ui.painter(), mark, &palette);
                     ui.label(RichText::new("ais").strong().size(16.0).color(palette.text));
                     ui.add_space(6.0);
@@ -158,10 +158,17 @@ impl AisApp {
     fn title_controls(&mut self, ui: &mut egui::Ui, palette: &Palette) {
         let show_icons = self.settings.show_icons;
         if let UpdateStatus::Updated(version) = &self.update_status
-            && ui
-                .add(small_button(&format!("↻ v{version}"), palette))
-                .on_hover_text(format!("ais updated to v{version} — click to restart"))
-                .clicked()
+            && tool_button_tinted(
+                ui,
+                UiIcon::Refresh,
+                &format!("v{version}"),
+                false,
+                show_icons,
+                palette,
+                Some(palette.accent),
+            )
+            .on_hover_text(format!("ais updated to v{version} — click to restart"))
+            .clicked()
         {
             self.actions.push(Action::RestartToUpdate);
         }

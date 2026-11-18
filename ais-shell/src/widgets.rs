@@ -117,16 +117,28 @@ impl UiIcon {
                 painter.circle_filled(Pos2::new(c.x, base_y + r * 0.35), 1.4, color);
             }
             UiIcon::Refresh => {
-                let pts: Vec<Pos2> = (0..=14)
+                let rad = r * 0.84;
+                let start = 0.50_f32;
+                let end = std::f32::consts::TAU - 0.55;
+                let steps = 20;
+                let pts: Vec<Pos2> = (0..=steps)
                     .map(|i| {
-                        let angle = -0.3 + (i as f32 / 14.0) * std::f32::consts::PI * 1.55;
-                        c + Vec2::angled(angle) * (r * 0.85)
+                        let angle = start + (i as f32 / steps as f32) * (end - start);
+                        c + Vec2::angled(angle) * rad
                     })
                     .collect();
+                painter.circle_filled(pts[0], stroke.width * 0.5, color);
                 painter.add(egui::Shape::line(pts, stroke));
-                let tip = c + Vec2::angled(-0.3) * (r * 0.85);
-                painter.line_segment([tip, tip + Vec2::new(-3.2, -1.8)], stroke);
-                painter.line_segment([tip, tip + Vec2::new(0.8, -3.5)], stroke);
+                let tip = c + Vec2::angled(end) * rad;
+                let fwd = Vec2::angled(end + std::f32::consts::FRAC_PI_2 + 0.14);
+                let out = Vec2::angled(end);
+                let head = tip + fwd * (r * 0.28);
+                let back = tip - fwd * (r * 0.30);
+                painter.add(egui::Shape::convex_polygon(
+                    vec![head, back + out * (r * 0.36), back - out * (r * 0.34)],
+                    color,
+                    Stroke::NONE,
+                ));
             }
             UiIcon::Expand => {
                 let d = r * 0.85;
@@ -753,23 +765,26 @@ pub fn session_row(ui: &mut egui::Ui, session: &Session, palette: &Palette) -> e
 
 /// Brand mark that adapts to light/dark themes and saturation (including Mono).
 pub fn paint_logo(painter: &egui::Painter, rect: Rect, palette: &Palette) {
-    let radius = rect.width() * 0.24;
+    let radius = (rect.width() * (112.0 / 512.0)).round() as u8;
     let plate = if palette.light {
         palette.raised
     } else {
         Color32::from_rgb(17, 21, 31)
     };
-    painter.rect_filled(rect, CornerRadius::same(radius as u8), plate);
-    if palette.light {
-        painter.rect_stroke(
-            rect,
-            CornerRadius::same(radius as u8),
-            Stroke::new(1.0, palette.border_strong),
-            egui::StrokeKind::Inside,
-        );
-    }
+    let border = if palette.light {
+        palette.border_strong
+    } else {
+        palette.border
+    };
+    painter.rect_filled(rect, CornerRadius::same(radius), plate);
+    painter.rect_stroke(
+        rect,
+        CornerRadius::same(radius),
+        Stroke::new(1.0, border),
+        egui::StrokeKind::Inside,
+    );
     let s = rect.width() / 512.0;
-    let p = |x: f32, y: f32| rect.min + Vec2::new(x * s, y * s);
+    let to_pos = |pt: (f32, f32)| rect.min + Vec2::new(pt.0 * s, pt.1 * s);
     let tone = |color: Color32| {
         if palette.saturation < 1.0 {
             desaturate(color, palette.saturation)
@@ -780,21 +795,70 @@ pub fn paint_logo(painter: &egui::Painter, rect: Rect, palette: &Palette) {
     let c_cyan = tone(palette.cyan);
     let c_accent = tone(palette.accent);
     let c_green = tone(palette.green);
-    let stroke = |color: Color32| Stroke::new((25.0 * s).max(1.4), color);
-    let arch: Vec<Pos2> = (0..=16)
-        .map(|i| {
-            let t = std::f32::consts::PI * (1.0 - i as f32 / 16.0);
-            p(232.0 + 101.0 * t.cos(), 212.0 - 108.0 * t.sin())
-        })
-        .collect();
-    painter.line_segment([p(131.0, 350.0), p(131.0, 212.0)], stroke(c_cyan));
-    painter.add(egui::Shape::line(arch, stroke(c_accent)));
-    painter.line_segment([p(333.0, 212.0), p(333.0, 350.0)], stroke(c_accent));
-    painter.line_segment([p(131.0, 273.0), p(333.0, 273.0)], stroke(c_accent));
-    painter.line_segment([p(381.0, 161.0), p(381.0, 273.0)], stroke(c_green));
-    painter.line_segment([p(381.0, 273.0), p(274.0, 380.0)], stroke(c_green));
-    painter.line_segment([p(274.0, 380.0), p(171.0, 380.0)], stroke(c_green));
-    painter.circle_filled(p(256.0, 273.0), 27.0 * s, plate);
+    let mix = |a: Color32, b: Color32, t: f32| {
+        let ch = |x: u8, y: u8| (f32::from(x) + (f32::from(y) - f32::from(x)) * t).round() as u8;
+        Color32::from_rgb(ch(a.r(), b.r()), ch(a.g(), b.g()), ch(a.b(), b.b()))
+    };
+    let flow = |pt: (f32, f32)| {
+        let t = (((pt.0 - 100.0) * 300.0 + (pt.1 - 120.0) * 280.0) / 168_400.0).clamp(0.0, 1.0);
+        if t < 0.52 {
+            mix(c_cyan, c_accent, t / 0.52)
+        } else {
+            mix(c_accent, c_green, (t - 0.52) / 0.48)
+        }
+    };
+    let stroke_w = (26.0 * s).max(1.25);
+    let draw_path = |pts: &[(f32, f32)]| {
+        for (index, pair) in pts.windows(2).enumerate() {
+            let a = pair[0];
+            let b = pair[1];
+            let mid = ((a.0 + b.0) * 0.5, (a.1 + b.1) * 0.5);
+            if index == 0 {
+                painter.circle_filled(to_pos(a), stroke_w * 0.5, flow(a));
+            }
+            painter.line_segment([to_pos(a), to_pos(b)], Stroke::new(stroke_w, flow(mid)));
+            painter.circle_filled(to_pos(b), stroke_w * 0.5, flow(b));
+        }
+    };
+
+    // Main A-arch: M131 350 V212 c0-60 45-108 101-108 s101 48 101 108 v138
+    let mut arch = Vec::with_capacity(20);
+    arch.push((131.0, 350.0));
+    for i in 0..=16 {
+        let t = std::f32::consts::PI * (1.0 - i as f32 / 16.0);
+        arch.push((232.0 + 101.0 * t.cos(), 212.0 - 108.0 * t.sin()));
+    }
+    arch.push((333.0, 350.0));
+    draw_path(&arch);
+
+    // Crossbar: M131 273 h202
+    let crossbar: Vec<(f32, f32)> = (0..=6).map(|i| (131.0 + 202.0 * (i as f32 / 6.0), 273.0)).collect();
+    draw_path(&crossbar);
+
+    // Trailing J-curve: M381 161 v112 c0 59-48 107-107 107 H171
+    let mut hook = Vec::with_capacity(14);
+    hook.push((381.0, 161.0));
+    for i in 0..=10 {
+        let t = std::f32::consts::FRAC_PI_2 * (i as f32 / 10.0);
+        hook.push((274.0 + 107.0 * t.cos(), 273.0 + 107.0 * t.sin()));
+    }
+    hook.push((171.0, 380.0));
+    draw_path(&hook);
+
+    // At larger sizes (welcome card, etc.) render the center launch cutout and play mark.
+    if rect.width() >= 28.0 {
+        painter.circle_filled(to_pos((256.0, 273.0)), 30.0 * s, plate);
+        let ink = tone(if palette.light {
+            palette.text
+        } else {
+            Color32::from_rgb(237, 241, 248)
+        });
+        painter.add(egui::Shape::convex_polygon(
+            vec![to_pos((247.0, 255.0)), to_pos((275.0, 273.0)), to_pos((247.0, 291.0))],
+            ink,
+            Stroke::NONE,
+        ));
+    }
 }
 
 pub fn usage_color(used: f32, reset_passed: bool, palette: &Palette) -> Color32 {
@@ -1283,4 +1347,38 @@ pub fn right_tabs(
     let labels: Vec<&str> = items.iter().map(|(label, _)| *label).collect();
     let selected = items.iter().position(|(_, tab)| *tab == current).unwrap_or(0);
     tabs(ui, &labels, selected, palette).map(|index| items[index].1)
+}
+
+/// Lines scrolled per mouse-wheel notch (`LineDelta(0, 1)`).
+///
+/// Queries Windows `SPI_GETWHEELSCROLLLINES` when available so `ScrollArea` and
+/// terminal scrollback match native Windows scroll speed instead of egui's low
+/// 40pt default.
+pub fn wheel_scroll_lines() -> f32 {
+    static LINES: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+    *LINES.get_or_init(|| {
+        #[cfg(windows)]
+        {
+            let mut lines: u32 = 3;
+            let ok = unsafe {
+                windows_sys::Win32::UI::WindowsAndMessaging::SystemParametersInfoW(
+                    windows_sys::Win32::UI::WindowsAndMessaging::SPI_GETWHEELSCROLLLINES,
+                    0,
+                    (&mut lines as *mut u32).cast(),
+                    0,
+                )
+            };
+            if ok != 0 && lines > 0 {
+                if lines == u32::MAX {
+                    return 12.0;
+                }
+                return (lines as f32).clamp(1.0, 20.0);
+            }
+            3.0
+        }
+        #[cfg(not(windows))]
+        {
+            3.0
+        }
+    })
 }
