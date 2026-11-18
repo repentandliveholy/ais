@@ -1,0 +1,47 @@
+name: ais (Rust)
+
+on:
+  push:
+    paths:
+      - "ais-cli/**"
+      - "tests/fixtures/**"
+      - ".github/workflows/ais-rust.yml"
+  pull_request:
+    paths:
+      - "ais-cli/**"
+      - "tests/fixtures/**"
+      - ".github/workflows/ais-rust.yml"
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: ais-cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.92"
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ais-cli
+      - name: Format
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Test
+        run: cargo test
+      - name: Smoke test
+        shell: bash
+        run: |
+          cargo build --release
+          ./target/release/ais --version
+          ./target/release/ais --demo --snapshot snap.txt --cols 120 --rows 40
+          grep -q "AI SESSIONS" snap.txt
+          ./target/release/ais --json --all --no-cache > /dev/null

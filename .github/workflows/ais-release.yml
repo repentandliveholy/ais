@@ -1,0 +1,105 @@
+name: ais release
+
+# Push a tag like v0.4.1 (matching ais-cli/Cargo.toml) to publish binaries,
+# the signed update manifest and the installers as a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-14
+    strategy:
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.92"
+          targets: ${{ matrix.target }}
+      - name: Build
+        working-directory: ais-cli
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=. --remap-path-prefix=$HOME=."
+          cargo build --release --locked --target ${{ matrix.target }}
+          mkdir -p ../dist
+          cp target/${{ matrix.target }}/release/ais ../dist/ais-${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ais-${{ matrix.target }}
+          path: dist/*
+
+  zig:
+    # Linux (static musl) and Windows (GNU) cross builds, identical to the
+    # release machine's cargo-zigbuild setup.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-musl, aarch64-unknown-linux-musl, x86_64-pc-windows-gnu]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.92"
+          targets: ${{ matrix.target }}
+      - name: Install zig and cargo-zigbuild
+        run: |
+          pip install ziglang==0.13.0
+          cargo install --locked cargo-zigbuild
+      - name: Build
+        working-directory: ais-cli
+        run: |
+          export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=. --remap-path-prefix=$HOME=."
+          cargo zigbuild --release --locked --target ${{ matrix.target }}
+          mkdir -p ../dist
+          if [ -f target/${{ matrix.target }}/release/ais.exe ]; then
+            cp target/${{ matrix.target }}/release/ais.exe ../dist/ais-${{ matrix.target }}.exe
+          else
+            cp target/${{ matrix.target }}/release/ais ../dist/ais-${{ matrix.target }}
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ais-${{ matrix.target }}
+          path: dist/*
+
+  publish:
+    needs: [macos, zig]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.92"
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Manifest, checksums and signature
+        env:
+          AIS_SIGNING_KEY: ${{ secrets.AIS_SIGNING_KEY }}
+        run: |
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' ais-cli/Cargo.toml | head -1)
+          test "v$VERSION" = "${GITHUB_REF_NAME}" || test "${GITHUB_EVENT_NAME}" = workflow_dispatch
+          python3 ais-cli/release/make-manifest.py "$VERSION" dist
+          (cd ais-cli && cargo run --quiet --release --example release_sign -- sign - ../dist/latest.json)
+          cp ais-cli/release/install.sh ais-cli/release/install.ps1 dist/
+          (cd dist && sha256sum ais-* > SHA256SUMS)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A release published by hand (verified local builds) is never overwritten.
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists; keeping its assets."
+            exit 0
+          fi
+          gh release create "v$VERSION" dist/* --title "ais $VERSION" \
+            --notes-file ais-cli/release/notes.md --verify-tag

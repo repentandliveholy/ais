@@ -27,9 +27,10 @@ cargo run --release -- ~/code/my-project --run claude
 ais-shell [PATH] [--run omp|claude|codex|agy|gemini|pi|shell]
 ```
 
-Conversation lists and usage limits come from the Python `ais` indexer in the
-parent folder. It is found via `$AIS_BIN`, then `PATH`, then beside the
-executable (`../ais` in debug builds). Without it the app still works as a
+Conversation lists and usage limits come from the native `ais` CLI
+([`../ais-cli`](../ais-cli)); `bundle.sh` copies it into `ais.app/Contents/Resources`.
+It is found via `$AIS_BIN`, then `PATH`, then beside the executable / in the bundle
+Resources (`../ais` in debug builds). Without it the app still works as a
 multi-CLI terminal workspace.
 
 ## Requirements
