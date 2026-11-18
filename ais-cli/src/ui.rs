@@ -17,9 +17,9 @@ use crossterm::{cursor, execute, queue, terminal};
 use indexmap::IndexMap;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
@@ -2322,4 +2322,3 @@ mod tests {
         assert_eq!(copy_payload(&Entry::Session(s), true), "id1");
     }
 }
-
