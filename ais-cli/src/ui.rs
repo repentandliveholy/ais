@@ -117,7 +117,8 @@ const USAGE_REFRESH: Duration = Duration::from_secs(60);
 /// The strip refreshes rarely: each refresh runs the official CLIs.
 const STRIP_REFRESH_SECONDS: f64 = 300.0;
 const RESTART_KEY: Duration = Duration::from_millis(500);
-const SCROLL_STEP_INTERVAL: Duration = Duration::from_millis(40);
+/// Upper bound on rows moved per frame by one burst of queued wheel/arrow events.
+const MAX_BURST_STEPS: i64 = 5;
 const DOUBLE_CLICK: Duration = Duration::from_millis(450);
 pub const STRIP_WIDTH: i64 = 27;
 pub const STRIP_MIN_COLS: i64 = 150;
@@ -1155,28 +1156,7 @@ pub enum Outcome {
     New(String, String),
 }
 
-#[derive(Default)]
-struct WheelScroll {
-    moved_at: Option<Instant>,
-    direction: Option<Key>,
-}
-
-impl WheelScroll {
-    fn step(&mut self, direction: Key, current: Instant) -> i64 {
-        // Limit actual moves, not input reports. Ignored reports neither queue
-        // motion nor postpone the next allowed step during continuous scrolling.
-        if Some(direction) == self.direction && self.moved_at.is_some_and(|t| current - t < SCROLL_STEP_INTERVAL) {
-            return 0;
-        }
-        self.moved_at = Some(current);
-        self.direction = Some(direction);
-        1
-    }
-}
-
-struct Input {
-    mouse_seen: bool,
-}
+struct Input;
 
 impl Input {
     /// (key, came from a wheel) or None on timeout / ignored events.
@@ -1217,7 +1197,6 @@ impl Input {
                 ))
             }
             Event::Mouse(mouse) => {
-                self.mouse_seen = true;
                 match mouse.kind {
                     MouseEventKind::ScrollUp => Some((Key::Up, true)),
                     MouseEventKind::ScrollDown => Some((Key::Down, true)),
@@ -1232,30 +1211,27 @@ impl Input {
         }
     }
 
-    /// Discard queued wheel motion; keep its latest direction and the next key.
-    fn wheel_burst(&mut self, mut direction: Key) -> (Key, Option<(Key, bool)>) {
+    /// Drain queued scroll events of the same kind (wheel reports, or arrow
+    /// keys that terminals emit for wheel emulation / key repeat). Returns the
+    /// final direction, how many queued events point that way, and the first
+    /// unrelated event to process next.
+    fn scroll_burst(&mut self, mut direction: Key, from_mouse: bool) -> (Key, i64, Option<(Key, bool)>) {
+        let mut count = 1;
         loop {
             if !event::poll(Duration::ZERO).unwrap_or(false) {
-                return (direction, None);
+                return (direction, count, None);
             }
             match self.read(Duration::ZERO) {
                 None => continue,
-                Some((key, true)) => direction = key,
-                Some((key, false)) => return (direction, Some((key, false))),
-            }
-        }
-    }
-
-    /// Coalesce scroll-to-arrow emulation while mouse reports are unavailable.
-    fn arrow_burst(&mut self, mut direction: Key) -> (Key, Option<(Key, bool)>) {
-        loop {
-            if !event::poll(Duration::ZERO).unwrap_or(false) {
-                return (direction, None);
-            }
-            match self.read(Duration::ZERO) {
-                None => continue,
-                Some((key, mouse)) if mouse || !matches!(key, Key::Up | Key::Down) => return (direction, Some((key, mouse))),
-                Some((key, _)) => direction = key,
+                Some((key, mouse)) if mouse == from_mouse && matches!(key, Key::Up | Key::Down) => {
+                    if key == direction {
+                        count += 1;
+                    } else {
+                        direction = key;
+                        count = 1;
+                    }
+                }
+                Some(other) => return (direction, count, Some(other)),
             }
         }
     }
@@ -1442,7 +1418,7 @@ pub fn browse(collector: &mut Collector, view: &mut View) -> std::io::Result<Out
     spawn_scan(collector, &tx);
 
     let guard = TerminalGuard::enter()?;
-    let mut input = Input { mouse_seen: false };
+    let mut input = Input;
     let mut last_key = String::new();
     let mut chosen_since = Instant::now();
     let mut dirty = true;
@@ -1450,7 +1426,6 @@ pub fn browse(collector: &mut Collector, view: &mut View) -> std::io::Result<Out
     let mut last_render = Instant::now();
     let mut pending_input: Option<(Key, bool)> = None;
     let mut refresh_key_at: Option<Instant> = None;
-    let mut wheel = WheelScroll::default();
     let mut last_screen: Option<Screen> = None;
     let mut last_click: (Option<Instant>, Option<Action>) = (None, None);
     let mut painted: Vec<String> = Vec::new();
@@ -1668,24 +1643,13 @@ pub fn browse(collector: &mut Collector, view: &mut View) -> std::io::Result<Out
             break 'outer Outcome::Quit;
         }
         let mut steps: i64 = 1;
-        if from_mouse {
-            let (direction, pending) = input.wheel_burst(key);
+        if matches!(key, Key::Up | Key::Down) {
+            // Coalesce queued wheel reports and arrow repeats into one frame,
+            // keeping their count so fast scrolling never stalls or lags.
+            let (direction, count, pending) = input.scroll_burst(key, from_mouse);
             key = direction;
             pending_input = pending;
-            steps = wheel.step(key, Instant::now());
-            if steps == 0 {
-                continue;
-            }
-        } else if matches!(key, Key::Up | Key::Down) && !input.mouse_seen {
-            // Some terminals emulate wheel input with indistinguishable
-            // arrow keys. Protect that path until real mouse reports arrive.
-            let (direction, pending) = input.arrow_burst(key);
-            key = direction;
-            pending_input = pending;
-            steps = wheel.step(key, Instant::now());
-            if steps == 0 {
-                continue;
-            }
+            steps = count.min(MAX_BURST_STEPS);
         }
         dirty = true;
         if key == Key::Resize {

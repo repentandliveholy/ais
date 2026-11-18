@@ -906,9 +906,9 @@ pub fn which(binary: &str) -> Option<PathBuf> {
     let extensions: Vec<String> =
         std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into()).split(';').map(|s| s.to_lowercase()).collect();
     for dir in std::env::split_paths(&path) {
-        let full = dir.join(binary);
         #[cfg(unix)]
         {
+            let full = dir.join(binary);
             use std::os::unix::fs::PermissionsExt;
             if let Ok(meta) = std::fs::metadata(&full)
                 && meta.is_file()
@@ -918,19 +918,28 @@ pub fn which(binary: &str) -> Option<PathBuf> {
             }
         }
         #[cfg(windows)]
-        {
-            if full.is_file() {
-                return Some(full);
-            }
-            for ext in &extensions {
-                let with = dir.join(format!("{binary}{ext}"));
-                if with.is_file() {
-                    return Some(with);
-                }
-            }
+        if let Some(found) = windows_candidate(&dir, binary, &extensions) {
+            return Some(found);
         }
     }
     None
+}
+
+/// npm installs `codex` (a POSIX shell script), `codex.cmd` and `codex.ps1`
+/// side by side. CreateProcess cannot run the extensionless script, so prefer
+/// PATHEXT matches and accept a bare name only when it already carries an
+/// executable extension.
+#[cfg(any(windows, test))]
+fn windows_candidate(dir: &Path, binary: &str, extensions: &[String]) -> Option<PathBuf> {
+    for ext in extensions {
+        let with = dir.join(format!("{binary}{ext}"));
+        if with.is_file() {
+            return Some(with);
+        }
+    }
+    let full = dir.join(binary);
+    let lower = binary.to_lowercase();
+    (full.is_file() && extensions.iter().any(|ext| !ext.is_empty() && lower.ends_with(ext.as_str()))).then_some(full)
 }
 
 pub fn validate_launch(session: &Session) -> Result<Vec<String>, String> {
@@ -952,6 +961,21 @@ mod tests {
 
     fn session(client: &str, id: &str, cwd: &str, updated: f64) -> Session {
         Session { cwd: cwd.into(), updated, ..Session::new(client, id) }
+    }
+
+    #[test]
+    fn windows_which_skips_npm_shell_shim() {
+        let dir = std::env::temp_dir().join(format!("ais-which-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in ["codex", "codex.cmd", "codex.ps1", "tool.exe", "script"] {
+            std::fs::write(dir.join(name), "").unwrap();
+        }
+        let exts: Vec<String> = [".com", ".exe", ".bat", ".cmd"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(windows_candidate(&dir, "codex", &exts), Some(dir.join("codex.cmd")));
+        assert_eq!(windows_candidate(&dir, "tool.exe", &exts), Some(dir.join("tool.exe")));
+        assert_eq!(windows_candidate(&dir, "tool", &exts), Some(dir.join("tool.exe")));
+        assert_eq!(windows_candidate(&dir, "script", &exts), None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

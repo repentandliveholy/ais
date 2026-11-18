@@ -1,12 +1,11 @@
-**ais is now a single native binary** for macOS (Apple Silicon, Intel), Linux (x86_64, arm64, static) and Windows (x64), rewritten in Rust with the same screens, keys, search syntax, JSON output and history adapters as the Python edition.
+**ais 0.4.2**
 
-Install or upgrade:
+- **Windows:** live Codex usage works again. ais picked npm's extensionless `codex` shell shim, which Windows cannot run ("Could not launch official CLI"); it now runs `codex.cmd` / `.exe` from PATHEXT.
+- **Smoother scrolling:** wheel and trackpad bursts move by the number of events (up to 5 rows per frame) instead of one row per 40 ms, so fast scrolling no longer stalls.
+
+Install or upgrade (installed copies update themselves within a day; `ais --update` updates now):
 
 ```sh
 curl -fsSL https://ais.repentandliveholy.org/install.sh | sh      # macOS / Linux
 irm https://ais.repentandliveholy.org/install.ps1 | iex          # Windows PowerShell
 ```
-
-From this version on ais **updates itself**: once a day it checks the Ed25519-signed release manifest and replaces itself after verifying the SHA-256 of the new binary. `ais --update` checks right away; `AIS_NO_UPDATE=1` or `"auto_update": false` turns it off.
-
-The Python edition remains in the repository as an optional `ais-py`.
