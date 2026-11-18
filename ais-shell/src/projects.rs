@@ -890,13 +890,17 @@ mod tests {
                     [],
                 )
                 .unwrap();
+            let uri = format!(
+                "file:///{}",
+                workspace.to_string_lossy().replace('\\', "/").trim_start_matches('/')
+            );
             connection
                 .execute(
                     "INSERT INTO conversation_summaries VALUES (?1, ?2, ?3, ?4)",
                     rusqlite::params![
                         "Agy task",
                         "CASCADE_RUN_STATUS_IDLE",
-                        format!("[\"file://{}\"]", workspace.display()),
+                        serde_json::json!([uri]).to_string(),
                         "2026-11-16 00:00:00+00:00"
                     ],
                 )
