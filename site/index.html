@@ -241,10 +241,12 @@
         <p class="note" id="installNote" data-i18n="note">Installs <code>ais</code> (CLI) and <code>ais-gui</code> (GUI) to ~/.local/bin with SHA-256 verification.</p>
       </div>
 
+      <div class="shot"><img src="ais-gui-preview.png" width="2640" height="1680" alt="ais desktop GUI workspace (demo data)"></div>
+
       <div class="editions-grid">
         <div class="edition-card">
           <h3>ais <span class="pill" data-i18n="guiBadge">Desktop GUI</span></h3>
-          <p data-i18n="guiDesc">Native GPU-rendered workspace for macOS, Windows (ConPTY), and Linux. No Electron, no runtime.</p>
+          <p data-i18n="guiDesc">Native GPU-rendered workspace (<code>ais-gui</code> / <code>ais.app</code>) for macOS, Windows (ConPTY), and Linux. No Electron, no runtime.</p>
           <ul>
             <li data-i18n="g1">Up to 4 split terminal panes per project space (alacritty engine + kitty keys)</li>
             <li data-i18n="g2">Live agent pills (working / waiting / needs you / error) &amp; desktop notifications</li>
@@ -254,20 +256,28 @@
           </ul>
         </div>
         <div class="edition-card">
-          <h3>ais-cli <span class="pill" data-i18n="cliBadge">Terminal CLI &amp; TUI</span></h3>
+          <h3>ais <span class="pill" data-i18n="cliBadge">Terminal CLI &amp; TUI</span></h3>
           <p data-i18n="cliDesc">Fast ~6 MB terminal browser and local session indexer. Ideal over SSH, in Warp, or headless.</p>
           <ul>
             <li data-i18n="c1">Flat project list or nested folder tree with pin, search, and client filters</li>
             <li data-i18n="c2">One-key resume in the session's original directory and client; returns on exit</li>
             <li data-i18n="c3">5h &amp; weekly limits per account with reset countdowns, pace forecast &amp; DeepSeek balance</li>
-            <li data-i18n="c4">Scriptable JSON output (<code>--json</code>, <code>--usage --json</code>) powering <code>ais</code></li>
-            <li data-i18n="c5">Daily Ed25519-signed self-updates (<code>ais-cli --update</code>) on macOS, Linux, and Windows</li>
+            <li data-i18n="c4">Scriptable JSON output (<code>--json</code>, <code>--usage --json</code>) powering the GUI</li>
+            <li data-i18n="c5">Daily Ed25519-signed self-updates (<code>ais --update</code>) on macOS, Linux, and Windows</li>
           </ul>
         </div>
       </div>
     </div>
 
-    <div class="shot"><img src="ais-preview.png" width="1336" height="920" alt="ais session browser (demo data)" loading="lazy"></div>
+    <section>
+      <div class="split">
+        <div>
+          <h2 data-i18n="cliShotTitle">Terminal TUI included</h2>
+          <p class="sub" data-i18n="cliShotSub">Prefer working straight inside your existing terminal or over SSH? The <code>ais</code> CLI gives you the same instant project tree, search filters, and one-key resume without opening a GUI window.</p>
+        </div>
+        <img src="ais-preview.png" width="1336" height="920" alt="ais terminal TUI session browser (demo data)" loading="lazy">
+      </div>
+    </section>
 
     <section>
       <h2 data-i18n="featuresTitle">Everything you said to an AI, one keystroke away</h2>
@@ -374,8 +384,10 @@
         c1: "Список или дерево проектов с закреплением, поиском и фильтрами по клиентам",
         c2: "Запуск в родном каталоге и клиенте одной клавишей с возвратом при выходе",
         c3: "Лимиты 5ч и неделя по аккаунтам, время сброса, прогноз темпа и баланс DeepSeek",
-        c4: "JSON-вывод (<code>--json</code>, <code>--usage --json</code>), который использует GUI <code>ais</code>",
-        c5: "Ежедневное автообновление с подписью Ed25519 (<code>ais-cli --update</code>) на macOS, Linux и Windows",
+        c4: "JSON-вывод (<code>--json</code>, <code>--usage --json</code>), который использует GUI",
+        c5: "Ежедневное автообновление с подписью Ed25519 (<code>ais --update</code>) на macOS, Linux и Windows",
+        cliShotTitle: "Терминальный TUI в комплекте",
+        cliShotSub: "Удобнее работать прямо в терминале или по SSH? Консольный <code>ais</code> даёт то же дерево проектов, фильтры поиска и запуск в один клик без GUI-окна.",
         featuresTitle: "Всё, что вы говорили ИИ, — под рукой",
         featuresSub: "Только чтение, локально, быстро. Ни ais, ни ais-cli не меняют историю клиентов и никуда её не отправляют.",
         f1t: "Проекты и панели", f1d: "Список или дерево проектов в ais-cli, или несколько папок со сплит-панелями терминалов в GUI ais.",
@@ -419,8 +431,10 @@
         c1: "Liste plate ou arborescence des projets avec épinglage, recherche et filtres par client",
         c2: "Reprise en une touche dans le dossier et le client d’origine",
         c3: "Limites 5 h et hebdomadaires par compte, réinitialisation, prévision et solde DeepSeek",
-        c4: "Sortie JSON (<code>--json</code>, <code>--usage --json</code>) utilisée par <code>ais</code>",
-        c5: "Mise à jour auto signée Ed25519 (<code>ais-cli --update</code>) sur macOS, Linux et Windows",
+        c4: "Sortie JSON (<code>--json</code>, <code>--usage --json</code>) utilisée par le GUI",
+        c5: "Mise à jour auto signée Ed25519 (<code>ais --update</code>) sur macOS, Linux et Windows",
+        cliShotTitle: "TUI terminal inclus",
+        cliShotSub: "Vous préférez votre terminal habituel ou SSH ? Le CLI <code>ais</code> offre la même arborescence, les mêmes filtres et la reprise en une touche sans fenêtre GUI.",
         featuresTitle: "Tout ce que vous avez dit à une IA, à portée de main",
         featuresSub: "Lecture seule, locale, rapide. Ni ais ni ais-cli ne modifient ou n’envoient vos historiques.",
         f1t: "Projets et panneaux", f1d: "Liste ou arborescence dans ais-cli, ou espaces multi-projets avec terminaux scindés dans ais.",

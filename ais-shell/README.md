@@ -9,7 +9,7 @@ plan usage limits and one-click resume of any saved conversation.
 It is the windowed companion of the [`ais`](../README.md) terminal launcher and
 reads the same local histories. No Electron, no account: one ~6 MB binary.
 
-![ais · AI Sessions preview](../artifacts/ais-preview.png)
+![ais · AI Sessions preview](../artifacts/ais-gui-preview.png)
 
 ## Install
 
