@@ -182,10 +182,10 @@ fn strip_verbatim(path: PathBuf) -> PathBuf {
     #[cfg(windows)]
     {
         let text = path.to_string_lossy();
-        if let Some(rest) = text.strip_prefix(r"\\?\") {
-            if !rest.starts_with("UNC") {
-                return PathBuf::from(rest);
-            }
+        if let Some(rest) = text.strip_prefix(r"\\?\")
+            && !rest.starts_with("UNC")
+        {
+            return PathBuf::from(rest);
         }
     }
     path
@@ -978,7 +978,7 @@ mod tests {
     fn projects_nest_and_order_by_latest_activity() {
         let dir = tempfile::tempdir().unwrap();
         let root = realpath(dir.path()).to_string_lossy().into_owned();
-        let api = format!("{root}/api");
+        let api = Path::new(&root).join("api").to_string_lossy().into_owned();
         let other = format!("{root}-other");
         for p in [&api, &other] {
             std::fs::create_dir_all(p).unwrap();
