@@ -18,7 +18,7 @@ export RUSTFLAGS="${RUSTFLAGS:-} ${REMAP_FLAGS}"
 
 cargo build --release
 
-BIN="target/release/ais-shell"
+BIN="target/release/ais"
 if strings "$BIN" | grep -F -q "${HOME}"; then
   echo "Error: release binary contains build-machine home path (${HOME})" >&2
   exit 1
@@ -30,10 +30,10 @@ rm -rf "$APP" "dist/ais.app.dSYM"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/ais"
 
-if [ -d "target/release/ais_shell.dSYM" ]; then
-  cp -RL "target/release/ais_shell.dSYM" "dist/ais.app.dSYM"
-elif [ -d "target/release/ais-shell.dSYM" ]; then
-  cp -RL "target/release/ais-shell.dSYM" "dist/ais.app.dSYM"
+if [ -d "target/release/ais.dSYM" ]; then
+  cp -RL "target/release/ais.dSYM" "dist/ais.app.dSYM"
+elif [ -d "target/release/ais_gui.dSYM" ]; then
+  cp -RL "target/release/ais_gui.dSYM" "dist/ais.app.dSYM"
 fi
 
 ICONSET="$TMP_DIR/ais.iconset"

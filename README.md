@@ -8,23 +8,32 @@ English · [Русский](README.ru.md)
 
 ## Install
 
-ais is a single native binary (Rust) for **macOS, Linux and Windows**. No runtime, no dependencies.
+Two native binaries (Rust) for **macOS, Linux and Windows**. No runtime, no dependencies:
+- **`ais`** — native desktop GUI workspace (multi-pane terminal, agent pills, toggleable blocks, fullscreen terminal, usage panel, session resume)
+- **`ais-cli`** — terminal launcher & TUI session browser (also serves as the fast session/usage indexer for `ais`)
 
-**macOS / Linux**
+**macOS / Linux (`ais` GUI + `ais-cli`)**
 
 ```sh
 curl -fsSL https://ais.repentandliveholy.org/install.sh | sh
 ```
 
-**Windows (PowerShell)**
+**Windows PowerShell (`ais` GUI + `ais-cli`)**
 
 ```powershell
 irm https://ais.repentandliveholy.org/install.ps1 | iex
 ```
 
+**CLI-only (`ais-cli`)**
+
+```sh
+curl -fsSL https://ais.repentandliveholy.org/install-cli.sh | sh   # macOS / Linux
+irm https://ais.repentandliveholy.org/install-cli.ps1 | iex       # Windows PowerShell
+```
+
 Mirror without the website: `curl -fsSL https://github.com/repentandliveholy/ais/releases/latest/download/install.sh | sh`.
 
-The installer picks the build for your OS and CPU (Apple Silicon / Intel, Linux x86_64 / arm64 static musl, Windows x64), checks its SHA-256 against the release `SHA256SUMS`, and installs to `~/.local/bin` (`%LOCALAPPDATA%\ais\bin` on Windows). Binaries are also attached to every [GitHub release](https://github.com/repentandliveholy/ais/releases). From source: `cargo install --path ais-cli`.
+The installer picks the build for your OS and CPU (Apple Silicon / Intel, Linux x86_64 / arm64, Windows x64), checks its SHA-256 against the release `SHA256SUMS`, and installs to `~/.local/bin` (`%LOCALAPPDATA%\ais\bin` on Windows). Binaries are also attached to every [GitHub release](https://github.com/repentandliveholy/ais/releases). From source: `cargo install --path ais-cli` (CLI) or `cd ais-shell && cargo build --release` (GUI).
 
 ### Updates
 
@@ -54,7 +63,7 @@ After `/exit` or another CLI exit, ais automatically returns to the browser and 
 
 Use `ais --no-return` for direct execution without returning. Interactive `--new` and `--resume` also return to the browser by default; scripts without a TTY launch once.
 
-**Desktop app:** [`ais-shell/`](ais-shell/README.md) is a native window for the same histories: live per-CLI agent status (working / waiting / needs you / error), a 5h/week usage panel, one-click resume, a real terminal (alacritty engine, kitty keys, mouse, bracketed paste) with split panes, and a ⌘P command palette. `./ais-shell/bundle.sh --install` builds `ais.app`.
+**Desktop app (`ais`):** [`ais-shell/`](ais-shell/README.md) is the native GUI window for **macOS, Windows, and Linux**: live per-CLI agent pills (working / waiting / needs you / error), a 5h/week usage panel, one-click resume, a real terminal (alacritty engine + ConPTY on Windows, kitty keys, mouse, bracketed paste) with split panes, easy per-block visibility toggles, fullscreen terminal (`⌘⇧↵` / `Ctrl+Shift+↵`), daily signed auto-updates, and a `⌘P` command palette. `./ais-shell/bundle.sh --install` builds `ais.app` on macOS.
 
 **Projects** is the start screen: a flat list of folders with saved sessions, ordered by last activity — the same behavior as before. `T` toggles a nested tree, where subfolders appear inside their parent folder with tree guides. `Enter` on a folder with subprojects opens that folder: the list shows its direct subfolders with sessions and the folder’s own sessions. `Enter` on a leaf folder opens its Sessions list; on a session it resumes. `O` opens the selected folder’s sessions directly. `Esc` or `Backspace` goes up one folder and then back to the Projects root. Search and client filters work on this page. Full paths distinguish folders with the same name; sessions without a directory have their own group.
 

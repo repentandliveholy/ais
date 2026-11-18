@@ -95,8 +95,23 @@ impl AisApp {
             self.unavailable_space(ui, space_index, &palette);
             return;
         }
-        self.toolbar(ui, space_index, &palette);
-        ui.add_space(6.0);
+        if !self.terminal_fullscreen {
+            let mut top_block = false;
+            if self.settings.show_toolbar {
+                self.toolbar(ui, space_index, &palette);
+                top_block = true;
+            }
+            if self.settings.show_agents {
+                if top_block {
+                    ui.add_space(6.0);
+                }
+                self.agent_strip(ui, &palette);
+                top_block = true;
+            }
+            if top_block {
+                ui.add_space(6.0);
+            }
+        }
         let area = ui.available_rect_before_wrap();
         ui.allocate_rect(area, Sense::hover());
         let (rects, dividers) = layout_panes(&self.spaces[space_index], area, 6.0);
@@ -289,6 +304,22 @@ impl AisApp {
         ui.horizontal(|ui| {
             ui.set_height(28.0);
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                if tool_button(
+                    ui,
+                    UiIcon::Fullscreen,
+                    "",
+                    self.terminal_fullscreen,
+                    show_icons,
+                    palette,
+                )
+                .on_hover_text(format!(
+                    "Fullscreen terminal  {}",
+                    self.key_hint(Cmd::FullscreenTerminal)
+                ))
+                .clicked()
+                {
+                    self.actions.push(Action::ToggleFullscreenTerminal);
+                }
                 if panes > 1
                     && tool_button(
                         ui,
@@ -323,6 +354,12 @@ impl AisApp {
                     .clicked()
                 {
                     self.actions.push(Action::Shell(Target::Auto));
+                }
+                if tool_button(ui, UiIcon::Agents, "", self.settings.show_agents, show_icons, palette)
+                    .on_hover_text(format!("Toggle agent pills  {}", self.key_hint(Cmd::ToggleAgents)))
+                    .clicked()
+                {
+                    self.actions.push(Action::ToggleAgents);
                 }
                 if tool_button(
                     ui,
@@ -383,10 +420,6 @@ impl AisApp {
                 });
             });
         });
-        if self.settings.show_agents {
-            ui.add_space(6.0);
-            self.agent_strip(ui, palette);
-        }
     }
 
     fn pane_ui(&mut self, ui: &mut egui::Ui, space_index: usize, uid: u64, rect: Rect, palette: &Palette) {
@@ -397,6 +430,7 @@ impl AisApp {
         let multi = self.spaces[space_index].panes.len() > 1;
         let zoomed = self.spaces[space_index].zoomed;
         let show_icons = self.settings.show_icons;
+        let show_header = !self.terminal_fullscreen && self.settings.show_pane_headers;
         let header_h = 30.0;
         let painter = ui.painter();
         let pane_ref = &self.spaces[space_index].panes[pane_index];
@@ -411,145 +445,170 @@ impl AisApp {
         } else {
             palette.border
         };
-        painter.rect(
-            rect,
-            CornerRadius::same(10),
-            if pane_ref.is_empty() {
-                palette.panel
-            } else {
-                palette.term.bg
-            },
-            Stroke::new(if is_active && multi { 1.5 } else { 1.0 }, border),
-            egui::StrokeKind::Inside,
-        );
-        let header = Rect::from_min_size(rect.min, Vec2::new(rect.width(), header_h));
-        painter.line_segment(
-            [
-                header.left_bottom() + Vec2::new(1.0, 0.0),
-                header.right_bottom() - Vec2::new(1.0, 0.0),
-            ],
-            Stroke::new(1.0, palette.border),
-        );
-        let body = Rect::from_min_max(
-            header.left_bottom() + Vec2::new(1.0, 1.0),
-            rect.max - Vec2::new(1.0, 1.0),
-        );
-
-        let mut header_ui = ui.new_child(
-            UiBuilder::new()
-                .id_salt(("pane-header", uid))
-                .max_rect(header)
-                .layout(Layout::left_to_right(Align::Center))
-                .sense(Sense::click()),
-        );
-        header_ui.expand_to_include_rect(header);
-        {
-            let pane = &self.spaces[space_index].panes[pane_index];
-            let mut actions = Vec::new();
-            let mut right_ui = header_ui.new_child(
-                UiBuilder::new()
-                    .max_rect(header)
-                    .layout(Layout::right_to_left(Align::Center)),
+        let fill = if pane_ref.is_empty() {
+            palette.panel
+        } else {
+            palette.term.bg
+        };
+        if self.terminal_fullscreen {
+            painter.rect_filled(rect, CornerRadius::ZERO, fill);
+        } else {
+            painter.rect(
+                rect,
+                CornerRadius::same(10),
+                fill,
+                Stroke::new(if is_active && multi { 1.5 } else { 1.0 }, border),
+                egui::StrokeKind::Inside,
             );
+        }
+        let body = if show_header {
+            let header = Rect::from_min_size(rect.min, Vec2::new(rect.width(), header_h));
+            painter.line_segment(
+                [
+                    header.left_bottom() + Vec2::new(1.0, 0.0),
+                    header.right_bottom() - Vec2::new(1.0, 0.0),
+                ],
+                Stroke::new(1.0, palette.border),
+            );
+            let body = Rect::from_min_max(
+                header.left_bottom() + Vec2::new(1.0, 1.0),
+                rect.max - Vec2::new(1.0, 1.0),
+            );
+
+            let mut header_ui = ui.new_child(
+                UiBuilder::new()
+                    .id_salt(("pane-header", uid))
+                    .max_rect(header)
+                    .layout(Layout::left_to_right(Align::Center))
+                    .sense(Sense::click()),
+            );
+            header_ui.expand_to_include_rect(header);
             {
-                let ui = &mut right_ui;
-                ui.spacing_mut().item_spacing.x = 4.0;
-                ui.add_space(6.0);
-                if close_button(ui, palette)
-                    .on_hover_text(format!("Close pane  {}", self.key_hint(Cmd::ClosePane)))
-                    .clicked()
+                let pane = &self.spaces[space_index].panes[pane_index];
+                let mut actions = Vec::new();
+                let mut right_ui = header_ui.new_child(
+                    UiBuilder::new()
+                        .max_rect(header)
+                        .layout(Layout::right_to_left(Align::Center)),
+                );
                 {
-                    actions.push(Action::ClosePane(uid));
-                }
-                if multi
-                    && tiny_icon_button(
-                        ui,
-                        if zoomed { UiIcon::Compress } else { UiIcon::Expand },
-                        show_icons,
-                        palette,
-                    )
-                    .on_hover_text(format!("Zoom  {}", self.key_hint(Cmd::ZoomPane)))
-                    .clicked()
-                {
-                    actions.push(Action::FocusPane(uid));
-                    actions.push(Action::ToggleZoom);
-                }
-                if pane.spec.is_some()
-                    && tiny_icon_button(ui, UiIcon::Refresh, show_icons, palette)
+                    let ui = &mut right_ui;
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    ui.add_space(6.0);
+                    if close_button(ui, palette)
+                        .on_hover_text(format!("Close pane  {}", self.key_hint(Cmd::ClosePane)))
+                        .clicked()
+                    {
+                        actions.push(Action::ClosePane(uid));
+                    }
+                    if tiny_icon_button(ui, UiIcon::Fullscreen, show_icons, palette)
                         .on_hover_text(format!(
-                            "{}  {}",
-                            if pane.is_running() {
-                                "Restart (kills the running program)"
-                            } else {
-                                "Run again"
-                            },
-                            self.key_hint(Cmd::RestartPane)
+                            "Fullscreen terminal  {}",
+                            self.key_hint(Cmd::FullscreenTerminal)
                         ))
                         .clicked()
+                    {
+                        actions.push(Action::FocusPane(uid));
+                        actions.push(Action::ToggleFullscreenTerminal);
+                    }
+                    if multi
+                        && tiny_icon_button(
+                            ui,
+                            if zoomed { UiIcon::Compress } else { UiIcon::Expand },
+                            show_icons,
+                            palette,
+                        )
+                        .on_hover_text(format!("Zoom  {}", self.key_hint(Cmd::ZoomPane)))
+                        .clicked()
+                    {
+                        actions.push(Action::FocusPane(uid));
+                        actions.push(Action::ToggleZoom);
+                    }
+                    if pane.spec.is_some()
+                        && tiny_icon_button(ui, UiIcon::Refresh, show_icons, palette)
+                            .on_hover_text(format!(
+                                "{}  {}",
+                                if pane.is_running() {
+                                    "Restart (kills the running program)"
+                                } else {
+                                    "Run again"
+                                },
+                                self.key_hint(Cmd::RestartPane)
+                            ))
+                            .clicked()
+                    {
+                        actions.push(Action::RestartPane(uid));
+                    }
+                }
+                let title_area = Rect::from_min_max(
+                    header.min + Vec2::new(10.0, 0.0),
+                    Pos2::new(
+                        (right_ui.min_rect().left() - 8.0).max(header.left() + 10.0),
+                        header.bottom(),
+                    ),
+                );
+                let mut left_ui = header_ui.new_child(
+                    UiBuilder::new()
+                        .max_rect(title_area)
+                        .layout(Layout::left_to_right(Align::Center)),
+                );
+                left_ui.set_clip_rect(title_area.intersect(ui.clip_rect()));
+                let ui = &mut left_ui;
+                ui.spacing_mut().item_spacing.x = 6.0;
+                if pane.is_busy() && !self.settings.reduce_motion {
+                    ui.add(egui::Spinner::new().size(11.0).color(accent));
+                } else {
+                    let (dot, _) = ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
+                    ui.painter()
+                        .circle_filled(dot.center(), 4.0, if pane.is_empty() { palette.faint } else { accent });
+                }
+                ui.add(
+                    egui::Label::new(RichText::new(pane.title()).strong().size(12.5).color(palette.text)).truncate(),
+                );
+                if let Some(exit) = &pane.exit {
+                    let ok = exit.code == 0 && exit.signal.is_none();
+                    ui.label(pill(&exit.describe(), if ok { palette.muted } else { palette.red }));
+                } else if pane.attention {
+                    ui.label(pill("▲ needs you", palette.amber));
+                } else if pane.is_busy() {
+                    ui.label(RichText::new("● working").size(11.0).color(accent));
+                }
+                let cwd = pane.cwd();
+                let detail = pane
+                    .osc_title
+                    .as_ref()
+                    .map(|title| title.trim().to_string())
+                    .filter(|title| !title.is_empty())
+                    .or_else(|| {
+                        cwd.as_ref()
+                            .and_then(|cwd| cwd.file_name())
+                            .map(|name| name.to_string_lossy().into_owned())
+                    });
+                if let Some(detail) = detail
+                    && ui.available_width() > 30.0
                 {
-                    actions.push(Action::RestartPane(uid));
+                    let label = ui.add(
+                        egui::Label::new(RichText::new(detail).size(scale::FONT_SM).color(palette.muted)).truncate(),
+                    );
+                    if let Some(cwd) = cwd {
+                        label.on_hover_text(cwd.display().to_string());
+                    }
                 }
+                self.actions.extend(actions);
             }
-            let title_area = Rect::from_min_max(
-                header.min + Vec2::new(10.0, 0.0),
-                Pos2::new(
-                    (right_ui.min_rect().left() - 8.0).max(header.left() + 10.0),
-                    header.bottom(),
-                ),
-            );
-            let mut left_ui = header_ui.new_child(
-                UiBuilder::new()
-                    .max_rect(title_area)
-                    .layout(Layout::left_to_right(Align::Center)),
-            );
-            left_ui.set_clip_rect(title_area.intersect(ui.clip_rect()));
-            let ui = &mut left_ui;
-            ui.spacing_mut().item_spacing.x = 6.0;
-            if pane.is_busy() && !self.settings.reduce_motion {
-                ui.add(egui::Spinner::new().size(11.0).color(accent));
-            } else {
-                let (dot, _) = ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
-                ui.painter()
-                    .circle_filled(dot.center(), 4.0, if pane.is_empty() { palette.faint } else { accent });
+            let header_click = header_ui.response();
+            if header_click.clicked() {
+                self.actions.push(Action::FocusPane(uid));
             }
-            ui.add(egui::Label::new(RichText::new(pane.title()).strong().size(12.5).color(palette.text)).truncate());
-            if let Some(exit) = &pane.exit {
-                let ok = exit.code == 0 && exit.signal.is_none();
-                ui.label(pill(&exit.describe(), if ok { palette.muted } else { palette.red }));
-            } else if pane.attention {
-                ui.label(pill("▲ needs you", palette.amber));
-            } else if pane.is_busy() {
-                ui.label(RichText::new("● working").size(11.0).color(accent));
+            if header_click.double_clicked() && multi {
+                self.actions.push(Action::ToggleZoom);
             }
-            let cwd = pane.cwd();
-            let detail = pane
-                .osc_title
-                .as_ref()
-                .map(|title| title.trim().to_string())
-                .filter(|title| !title.is_empty())
-                .or_else(|| {
-                    cwd.as_ref()
-                        .and_then(|cwd| cwd.file_name())
-                        .map(|name| name.to_string_lossy().into_owned())
-                });
-            if let Some(detail) = detail
-                && ui.available_width() > 30.0
-            {
-                let label = ui
-                    .add(egui::Label::new(RichText::new(detail).size(scale::FONT_SM).color(palette.muted)).truncate());
-                if let Some(cwd) = cwd {
-                    label.on_hover_text(cwd.display().to_string());
-                }
-            }
-            self.actions.extend(actions);
-        }
-        let header_click = header_ui.response();
-        if header_click.clicked() {
-            self.actions.push(Action::FocusPane(uid));
-        }
-        if header_click.double_clicked() && multi {
-            self.actions.push(Action::ToggleZoom);
-        }
+            body
+        } else if self.terminal_fullscreen {
+            rect
+        } else {
+            rect.shrink(1.0)
+        };
 
         if self.spaces[space_index].panes[pane_index].is_empty() {
             self.start_screen(ui, space_index, uid, body, palette);
@@ -1288,6 +1347,20 @@ impl AisApp {
                 actions.push(Action::ClosePane(uid));
                 ui.close_menu();
             }
+            ui.separator();
+            let fs_label = if self.terminal_fullscreen {
+                format!("Exit fullscreen terminal  {}", self.key_hint(Cmd::FullscreenTerminal))
+            } else {
+                format!("Fullscreen terminal  {}", self.key_hint(Cmd::FullscreenTerminal))
+            };
+            if ui.button(fs_label).clicked() {
+                actions.push(Action::FocusPane(uid));
+                actions.push(Action::ToggleFullscreenTerminal);
+                ui.close_menu();
+            }
+            ui.menu_button("Layout blocks", |ui| {
+                self.layout_blocks_menu(ui);
+            });
         });
         if pending_paste.is_some() {
             self.pending_paste = pending_paste;

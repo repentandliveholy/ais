@@ -2,7 +2,7 @@
 //! `ais --usage --json`. The cached snapshot is shown immediately; a live
 //! request through the official CLIs runs on demand or when opted in.
 
-use crate::cli::{CliKind, unix_time};
+use crate::cli::{CliKind, no_window, unix_time};
 use crate::log;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -388,17 +388,17 @@ pub fn wait_with_timeout(mut child: Child, timeout: Duration, label: &str) -> Re
 
 fn run(ais: &Path, live: bool) -> Result<UsageReport, String> {
     let mut command = Command::new(ais);
-    command.args(["--usage", "--json"]);
-    if !live {
-        command.arg("--cached-usage");
-    }
-    let child = command
+    command
+        .args(["--usage", "--json"])
         .env("NO_COLOR", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("Cannot run ais: {error}"))?;
+        .stderr(Stdio::piped());
+    if !live {
+        command.arg("--cached-usage");
+    }
+    no_window(&mut command);
+    let child = command.spawn().map_err(|error| format!("Cannot run ais: {error}"))?;
     let timeout = if live { LIVE_TIMEOUT } else { CACHE_TIMEOUT };
     let output = wait_with_timeout(child, timeout, "ais --usage")?;
     if !output.status.success() {

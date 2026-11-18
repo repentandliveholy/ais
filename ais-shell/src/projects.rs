@@ -381,8 +381,17 @@ fn parse_workspace_uris(raw: &str) -> Vec<PathBuf> {
         .iter()
         .filter_map(Value::as_str)
         .filter_map(|value| value.strip_prefix("file://"))
-        .map(|value| percent_decode_str(value).decode_utf8_lossy().into_owned())
-        .map(PathBuf::from)
+        .map(|value| {
+            let decoded = percent_decode_str(value).decode_utf8_lossy().into_owned();
+            #[cfg(windows)]
+            {
+                let bytes = decoded.as_bytes();
+                if bytes.len() >= 3 && bytes[0] == b'/' && bytes[1].is_ascii_alphabetic() && bytes[2] == b':' {
+                    return PathBuf::from(&decoded[1..]);
+                }
+            }
+            PathBuf::from(decoded)
+        })
         .collect()
 }
 

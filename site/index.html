@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>ais · AI Sessions</title>
-  <meta name="description" content="All conversations. One entry point. Browse and resume Claude Code, Codex, Gemini, agy, OMP and Pi sessions from one fast terminal app for macOS, Linux and Windows.">
+  <meta name="description" content="All conversations. One entry point. Native desktop workspace (ais) and fast terminal browser (ais-cli) for Claude Code, Codex, Gemini, agy, OMP and Pi on macOS, Windows and Linux.">
   <meta name="theme-color" content="#0a0d14">
   <link rel="canonical" href="https://ais.repentandliveholy.org/">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://ais.repentandliveholy.org/">
   <meta property="og:title" content="ais · AI Sessions">
-  <meta property="og:description" content="All conversations. One entry point. A single native binary for macOS, Linux and Windows.">
+  <meta property="og:description" content="Native GUI (ais) and terminal CLI (ais-cli) for macOS, Linux and Windows.">
   <meta property="og:image" content="https://ais.repentandliveholy.org/ais-preview.png">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <style>
@@ -116,19 +116,26 @@
       font-size: clamp(38px, 7vw, 68px); line-height: 1.05; margin: 22px 0 14px; letter-spacing: -0.03em;
       background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent;
     }
-    .lead { max-width: 720px; margin: 0 auto; color: var(--muted); font-size: clamp(17px, 2.2vw, 20px); }
+    .lead { max-width: 740px; margin: 0 auto; color: var(--muted); font-size: clamp(17px, 2.2vw, 20px); }
     .clients { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 26px 0 0; padding: 0; list-style: none; }
     .clients li { font: 600 13px var(--font-mono); padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); }
-    .install { margin: 40px auto 0; max-width: 760px; text-align: left; }
-    .tabs { display: flex; gap: 6px; margin-bottom: -1px; position: relative; z-index: 1; }
+    .install { margin: 36px auto 0; max-width: 760px; text-align: left; }
+    .tab-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 8px; margin-bottom: -1px; position: relative; z-index: 1; }
+    .tabs { display: flex; gap: 6px; }
     .tabs button {
       font: 600 14px var(--font-sans); color: var(--muted); background: transparent; border: 1px solid transparent;
       border-bottom: 0; border-radius: 12px 12px 0 0; padding: 10px 16px; cursor: pointer;
     }
     .tabs button[aria-selected="true"] { color: #e2e8f0; background: var(--code-bg); border-color: var(--border-strong); }
+    .editions { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); margin-bottom: 6px; }
+    .editions button {
+      font: 600 12px/1 var(--font-sans); color: var(--muted); background: transparent; border: 0;
+      padding: 6px 12px; border-radius: 999px; cursor: pointer;
+    }
+    .editions button[aria-selected="true"] { color: var(--text); background: var(--border-strong); }
     .code {
       position: relative; background: var(--code-bg); color: #e2e8f0; border: 1px solid var(--border-strong);
-      border-radius: 0 var(--radius) var(--radius) var(--radius); padding: 18px 64px 18px 20px;
+      border-radius: 0 var(--radius) var(--radius) var(--radius); padding: 18px 72px 18px 20px;
       font: 15px/1.5 var(--font-mono); overflow-x: auto; white-space: nowrap;
     }
     .code .prompt { color: #64748b; user-select: none; margin-right: 10px; }
@@ -139,32 +146,40 @@
     }
     .copy:hover { background: rgba(255,255,255,.16); }
     .note { color: var(--dim); font-size: 14px; margin: 12px 4px 0; }
-    .shot { margin: 56px auto 0; max-width: 1000px; }
+    .editions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 36px; text-align: left; }
+    .edition-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+    .edition-card h3 { margin: 0 0 6px; font-size: 20px; display: flex; align-items: center; gap: 8px; }
+    .pill { font: 600 11px var(--font-mono); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--cyan); }
+    .edition-card p { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
+    .edition-card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+    .edition-card li + li { margin-top: 4px; }
+    .shot { margin: 48px auto 0; max-width: 1000px; }
     .shot img {
       width: 100%; height: auto; display: block; border-radius: 18px; border: 1px solid var(--border-strong);
       box-shadow: 0 30px 80px -30px rgba(0,0,0,.7), 0 0 60px rgba(185,163,255,.12);
     }
     section { padding: 64px 0 0; }
     h2 { font-size: clamp(26px, 4vw, 36px); letter-spacing: -0.02em; margin: 0 0 8px; }
-    .sub { color: var(--muted); margin: 0 0 28px; max-width: 720px; }
+    h3.group-title { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 28px 0 10px; }
+    .sub { color: var(--muted); margin: 0 0 28px; max-width: 740px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
     .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; }
     .card h3 { margin: 0 0 6px; font-size: 17px; }
     .card p { margin: 0; color: var(--muted); font-size: 15px; }
     .card .ico { font: 700 18px var(--font-mono); margin-bottom: 10px; display: block; }
-    .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 6px 22px; }
+    .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 22px; }
     .keys div { display: flex; gap: 12px; align-items: baseline; padding: 7px 0; border-bottom: 1px dashed var(--border); font-size: 15px; }
     kbd {
       font: 600 12px var(--font-mono); padding: 3px 7px; border-radius: 6px; border: 1px solid var(--border-strong);
-      background: var(--card); min-width: 64px; text-align: center; white-space: nowrap;
+      background: var(--card); min-width: 72px; text-align: center; white-space: nowrap;
     }
     .keys span { color: var(--muted); }
     .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; }
-    .split img { width: 100%; border-radius: 14px; border: 1px solid var(--border-strong); }
-    .platforms { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+    .split img { width: 100%; height: auto; display: block; border-radius: 14px; border: 1px solid var(--border-strong); }
+    .platforms { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
     .platforms a { display: block; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); }
     .platforms a:hover { border-color: var(--border-strong); text-decoration: none; }
-    .platforms small { display: block; color: var(--dim); font: 12px var(--font-mono); margin-top: 3px; }
+    .platforms small { display: block; color: var(--dim); font: 12px var(--font-mono); margin-top: 3px; word-break: break-all; }
     footer { margin: 80px 0 0; padding: 28px 0 40px; border-top: 1px solid var(--border); color: var(--dim); font-size: 14px; }
     footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
     #version { font-family: var(--font-mono); }
@@ -197,9 +212,9 @@
 
   <main class="wrap">
     <div class="hero">
-      <span class="badge"><span class="dot"></span><span data-i18n="badge">Native binary · macOS · Linux · Windows</span> <span id="version"></span></span>
+      <span class="badge"><span class="dot"></span><span data-i18n="badge">Native GUI &amp; CLI · macOS · Windows · Linux</span> <span id="version"></span></span>
       <h1 data-i18n="title">All conversations.<br>One entry point.</h1>
-      <p class="lead" data-i18n="lead">ais finds every saved session of your AI coding CLIs, shows them by project with status, model and last message, and resumes any of them in its own client and folder — in one keystroke.</p>
+      <p class="lead" data-i18n="lead">Two fast Rust companions for your AI coding CLIs: <strong>ais</strong> (native multi-pane desktop GUI) and <strong>ais-cli</strong> (lightweight terminal TUI). Browse every project, track 5h/week usage limits, and resume any session in one click or keystroke.</p>
       <ul class="clients">
         <li style="color:var(--amber)">Claude Code</li>
         <li style="color:var(--blue)">Codex</li>
@@ -210,14 +225,45 @@
       </ul>
 
       <div class="install">
-        <div class="tabs" role="tablist">
-          <button type="button" role="tab" data-os="unix" aria-selected="true">macOS · Linux</button>
-          <button type="button" role="tab" data-os="win" aria-selected="false">Windows</button>
+        <div class="tab-bar">
+          <div class="tabs" role="tablist">
+            <button type="button" role="tab" data-os="unix" aria-selected="true">macOS · Linux</button>
+            <button type="button" role="tab" data-os="win" aria-selected="false">Windows</button>
+          </div>
+          <div class="editions" role="tablist">
+            <button type="button" role="tab" data-ed="gui" aria-selected="true" data-i18n="edGui">ais (GUI + CLI)</button>
+            <button type="button" role="tab" data-ed="cli" aria-selected="false" data-i18n="edCli">ais-cli (CLI only)</button>
+          </div>
         </div>
         <div class="code"><span class="prompt" id="prompt">$</span><span id="cmd">curl -fsSL https://ais.repentandliveholy.org/install.sh | sh</span>
           <button class="copy" type="button" id="copy" data-i18n="copy">Copy</button>
         </div>
-        <p class="note" data-i18n="note">Picks the build for your OS and CPU, verifies its SHA-256 and installs to ~/.local/bin. Then just run <code>ais</code>.</p>
+        <p class="note" id="installNote" data-i18n="note">Installs <code>ais</code> (GUI) and <code>ais-cli</code> to ~/.local/bin with SHA-256 verification.</p>
+      </div>
+
+      <div class="editions-grid">
+        <div class="edition-card">
+          <h3>ais <span class="pill" data-i18n="guiBadge">Desktop GUI</span></h3>
+          <p data-i18n="guiDesc">Native GPU-rendered workspace for macOS, Windows (ConPTY), and Linux. No Electron, no runtime.</p>
+          <ul>
+            <li data-i18n="g1">Up to 4 split terminal panes per project space (alacritty engine + kitty keys)</li>
+            <li data-i18n="g2">Live agent pills (working / waiting / needs you / error) &amp; desktop notifications</li>
+            <li data-i18n="g3">Toggle any UI block on/off (Title bar, Sidebar, Toolbar, Agent pills, Headers, Status bar)</li>
+            <li data-i18n="g4">Fullscreen terminal mode (⌘⇧↵ / Ctrl+Shift+↵) &amp; OS window fullscreen</li>
+            <li data-i18n="g5">Command palette (⌘P), 15 themes, file tree with @mention insertion, daily signed auto-updates</li>
+          </ul>
+        </div>
+        <div class="edition-card">
+          <h3>ais-cli <span class="pill" data-i18n="cliBadge">Terminal CLI &amp; TUI</span></h3>
+          <p data-i18n="cliDesc">Fast ~6 MB terminal browser and local session indexer. Ideal over SSH, in Warp, or headless.</p>
+          <ul>
+            <li data-i18n="c1">Flat project list or nested folder tree with pin, search, and client filters</li>
+            <li data-i18n="c2">One-key resume in the session's original directory and client; returns on exit</li>
+            <li data-i18n="c3">5h &amp; weekly limits per account with reset countdowns, pace forecast &amp; DeepSeek balance</li>
+            <li data-i18n="c4">Scriptable JSON output (<code>--json</code>, <code>--usage --json</code>) powering <code>ais</code></li>
+            <li data-i18n="c5">Daily Ed25519-signed self-updates (<code>ais-cli --update</code>) on macOS, Linux, and Windows</li>
+          </ul>
+        </div>
       </div>
     </div>
 
@@ -225,14 +271,14 @@
 
     <section>
       <h2 data-i18n="featuresTitle">Everything you said to an AI, one keystroke away</h2>
-      <p class="sub" data-i18n="featuresSub">Read-only, local, fast. ais never edits client history and never sends it anywhere.</p>
+      <p class="sub" data-i18n="featuresSub">Read-only, local, fast. Neither ais nor ais-cli ever edits client history or sends your conversations anywhere.</p>
       <div class="grid">
-        <div class="card"><span class="ico" style="color:var(--green)">▸ ▾</span><h3 data-i18n="f1t">Projects first</h3><p data-i18n="f1d">Folders with sessions ordered by last activity, as a flat list or a nested tree. Enter drills in; Backspace goes back.</p></div>
-        <div class="card"><span class="ico" style="color:var(--amber)">↩</span><h3 data-i18n="f2t">Resume where it was</h3><p data-i18n="f2d">Enter starts the original CLI with its native resume flag in the session's own directory, then returns you to the list.</p></div>
-        <div class="card"><span class="ico" style="color:var(--cyan)">⌕</span><h3 data-i18n="f3t">Search that understands you</h3><p data-i18n="f3d">Words, -exclusions and filters: client:, model:, status:, branch:, dir:, since:3d, is:pinned — with highlighted matches.</p></div>
-        <div class="card"><span class="ico" style="color:var(--accent)">▰▱</span><h3 data-i18n="f4t">5h and weekly limits</h3><p data-i18n="f4d">Usage per account from the official CLIs — Claude, Codex, agy — with reset times and a pace forecast. Plus DeepSeek balance.</p></div>
-        <div class="card"><span class="ico" style="color:var(--blue)">⟳</span><h3 data-i18n="f5t">Updates itself, safely</h3><p data-i18n="f5d">Once a day ais checks an Ed25519-signed release manifest and swaps in the new binary only after its SHA-256 matches.</p></div>
-        <div class="card"><span class="ico" style="color:var(--pink)">◆</span><h3 data-i18n="f6t">One small binary</h3><p data-i18n="f6d">Rust, ~6 MB, no runtime. macOS (Apple Silicon, Intel), static Linux (x86_64, arm64) and Windows x64. English, Russian, French.</p></div>
+        <div class="card"><span class="ico" style="color:var(--green)">▸ ▾</span><h3 data-i18n="f1t">Projects &amp; panes</h3><p data-i18n="f1d">Browse projects as a flat list or tree in ais-cli, or open multiple folders as spaces with split terminal panes in the ais GUI.</p></div>
+        <div class="card"><span class="ico" style="color:var(--amber)">↩</span><h3 data-i18n="f2t">Resume where it was</h3><p data-i18n="f2d">Launch or resume Claude, Codex, Gemini, agy, OMP or Pi in the session's own directory with one click or Enter.</p></div>
+        <div class="card"><span class="ico" style="color:var(--cyan)">⊞</span><h3 data-i18n="f3t">Modular blocks &amp; Zen</h3><p data-i18n="f3d">Switch Title bar, Sidebar, Toolbar, Agent pills, Pane headers, or Status bar on/off anytime — or jump into edge-to-edge Fullscreen terminal.</p></div>
+        <div class="card"><span class="ico" style="color:var(--accent)">▰▱</span><h3 data-i18n="f4t">5h and weekly limits</h3><p data-i18n="f4d">Usage per account from the official CLIs — Claude, Codex, agy — with reset times and pace forecast. Plus DeepSeek balance.</p></div>
+        <div class="card"><span class="ico" style="color:var(--blue)">⟳</span><h3 data-i18n="f5t">Updates itself, safely</h3><p data-i18n="f5d">Both ais and ais-cli check an Ed25519-signed manifest once a day, verify SHA-256 checksums, and swap binaries atomically.</p></div>
+        <div class="card"><span class="ico" style="color:var(--pink)">◆</span><h3 data-i18n="f6t">Cross-platform native</h3><p data-i18n="f6d">Pure Rust for macOS (Apple Silicon &amp; Intel), Windows x64 (ConPTY), and Linux (X11 / Wayland / static musl). EN / RU / FR.</p></div>
       </div>
     </section>
 
@@ -240,7 +286,7 @@
       <div class="split">
         <div>
           <h2 data-i18n="usageTitle">Know your limits before they hit</h2>
-          <p class="sub" data-i18n="usageSub">Press U. Every signed-in account gets its own block: plan, config dirs, local activity, used and remaining for each window, when it resets, and whether the current pace will run out first. Two Claude logins stay two blocks; one login in two folders is shown once.</p>
+          <p class="sub" data-i18n="usageSub">Press ⌘U in ais or U in ais-cli. Every signed-in account gets its own block: plan, config dirs, local activity, used and remaining for each window, reset time, and pace forecast.</p>
         </div>
         <img src="ais-usage.png" width="1336" height="1280" alt="ais usage panel (demo data)" loading="lazy">
       </div>
@@ -248,31 +294,49 @@
 
     <section>
       <h2 data-i18n="keysTitle">Keys</h2>
+      <h3 class="group-title" data-i18n="keysGui">ais (GUI) — ⌘ on macOS · Ctrl+ on Windows &amp; Linux</h3>
+      <div class="keys">
+        <div><kbd>⌘P</kbd><span data-i18n="kg1">command palette</span></div>
+        <div><kbd>⌘⇧↵</kbd><span data-i18n="kg2">fullscreen terminal</span></div>
+        <div><kbd>⌘↵</kbd><span data-i18n="kg3">zoom active pane</span></div>
+        <div><kbd>⌘D / ⌘⇧D</kbd><span data-i18n="kg4">split right / split down</span></div>
+        <div><kbd>⌘T</kbd><span data-i18n="kg5">new terminal</span></div>
+        <div><kbd>⌘⇧G</kbd><span data-i18n="kg6">toggle agent pills</span></div>
+        <div><kbd>⌘B / ⌘U</kbd><span data-i18n="kg7">toggle sidebar / usage</span></div>
+        <div><kbd>⌘,</kbd><span data-i18n="kg8">settings &amp; updates</span></div>
+      </div>
+      <h3 class="group-title" data-i18n="keysCli">ais-cli (Terminal TUI)</h3>
       <div class="keys">
         <div><kbd>↑↓ j k</kbd><span data-i18n="k1">select</span></div>
         <div><kbd>Enter</kbd><span data-i18n="k2">open folder · resume</span></div>
         <div><kbd>/</kbd><span data-i18n="k3">search</span></div>
         <div><kbd>Tab</kbd><span data-i18n="k4">current directory / all</span></div>
         <div><kbd>← → 0–6</kbd><span data-i18n="k5">filter by client</span></div>
-        <div><kbd>N</kbd><span data-i18n="k6">new session</span></div>
-        <div><kbd>F</kbd><span data-i18n="k7">pin</span></div>
-        <div><kbd>y Y</kbd><span data-i18n="k8">copy command / ID</span></div>
+        <div><kbd>N / F</kbd><span data-i18n="k6">new session / pin</span></div>
         <div><kbd>P S U</kbd><span data-i18n="k9">projects · sessions · usage</span></div>
-        <div><kbd>T</kbd><span data-i18n="k10">project tree</span></div>
-        <div><kbd>L</kbd><span data-i18n="k11">language</span></div>
-        <div><kbd>?</kbd><span data-i18n="k12">all keys</span></div>
+        <div><kbd>T / L / ?</kbd><span data-i18n="k10">tree · language · all keys</span></div>
       </div>
     </section>
 
     <section>
       <h2 data-i18n="dlTitle">Downloads</h2>
-      <p class="sub" data-i18n="dlSub">Prefer a manual install? Grab the binary for your platform from the latest release, or build it with cargo install --path ais-cli.</p>
+      <p class="sub" data-i18n="dlSub">Prefer a manual install? Grab any binary from the latest GitHub release, or build from source with Cargo.</p>
+
+      <h3 class="group-title" data-i18n="dlGui">ais — Desktop GUI</h3>
       <div class="platforms">
+        <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-gui-x86_64-pc-windows-msvc.exe">Windows · x64<small>ais-gui-x86_64-pc-windows-msvc.exe</small></a>
+        <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-gui-aarch64-apple-darwin">macOS · Apple Silicon<small>ais-gui-aarch64-apple-darwin</small></a>
+        <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-gui-x86_64-apple-darwin">macOS · Intel<small>ais-gui-x86_64-apple-darwin</small></a>
+        <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-gui-x86_64-unknown-linux-gnu">Linux · x86_64<small>ais-gui-x86_64-unknown-linux-gnu</small></a>
+      </div>
+
+      <h3 class="group-title" data-i18n="dlCli">ais-cli — Terminal CLI &amp; TUI</h3>
+      <div class="platforms">
+        <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-x86_64-pc-windows-gnu.exe">Windows · x64<small>ais-x86_64-pc-windows-gnu.exe</small></a>
         <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-aarch64-apple-darwin">macOS · Apple Silicon<small>ais-aarch64-apple-darwin</small></a>
         <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-x86_64-apple-darwin">macOS · Intel<small>ais-x86_64-apple-darwin</small></a>
         <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-x86_64-unknown-linux-musl">Linux · x86_64<small>ais-x86_64-unknown-linux-musl</small></a>
         <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-aarch64-unknown-linux-musl">Linux · arm64<small>ais-aarch64-unknown-linux-musl</small></a>
-        <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-x86_64-pc-windows-gnu.exe">Windows · x64<small>ais-x86_64-pc-windows-gnu.exe</small></a>
         <a href="https://github.com/repentandliveholy/ais/releases/latest">SHA256SUMS · <span data-i18n="notes">release notes</span><small>github.com/…/releases</small></a>
       </div>
     </section>
@@ -281,7 +345,7 @@
   <footer>
     <div class="wrap">
       <span>ais · AI Sessions · MIT · <a href="https://repentandliveholy.org">repentandliveholy.org</a></span>
-      <span><a href="https://github.com/repentandliveholy/ais" data-i18n="source">Source code</a> · <a href="releases/latest.json">latest.json</a></span>
+      <span><a href="https://github.com/repentandliveholy/ais" data-i18n="source">Source code</a> · <a href="releases/ais-gui-latest.json">ais-gui-latest.json</a> · <a href="releases/latest.json">latest.json</a></span>
     </div>
   </footer>
 
@@ -289,61 +353,113 @@
     const I18N = {
       en: {},
       ru: {
-        badge: "Нативный бинарник · macOS · Linux · Windows",
+        badge: "Нативные GUI и CLI · macOS · Windows · Linux",
         title: "Все диалоги.<br>Один вход.",
-        lead: "ais находит все сохранённые сессии ваших AI-CLI, показывает их по проектам со статусом, моделью и последним сообщением и продолжает любую из них в своём клиенте и каталоге — одной клавишей.",
+        lead: "Два быстрых приложения на Rust для ваших AI-CLI: <strong>ais</strong> (нативный мультипанельный десктоп-GUI) и <strong>ais-cli</strong> (лёгкий терминальный TUI). Проекты, лимиты 5ч/неделя и возврат в любую сессию.",
+        edGui: "ais (GUI + CLI)", edCli: "ais-cli (только CLI)",
         copy: "Копировать", copied: "Скопировано",
-        note: "Выберет сборку под вашу ОС и процессор, сверит SHA-256 и поставит в ~/.local/bin. Дальше просто <code>ais</code>.",
-        noteWin: "Поставит ais.exe в %LOCALAPPDATA%\\ais\\bin, сверит SHA-256 и добавит папку в PATH. Дальше просто <code>ais</code>.",
-        featuresTitle: "Всё, что вы говорили ИИ, — в одном нажатии",
-        featuresSub: "Только чтение, локально, быстро. ais не меняет историю клиентов и никуда её не отправляет.",
-        f1t: "Сначала проекты", f1d: "Папки с сессиями по последней активности — списком или деревом. Enter — внутрь, Backspace — назад.",
-        f2t: "Продолжить там, где было", f2d: "Enter запускает исходный CLI с его родным флагом возобновления в каталоге сессии, а после выхода возвращает к списку.",
-        f3t: "Поиск, который понимает", f3d: "Слова, -исключения и фильтры: client:, model:, status:, branch:, dir:, since:3d, is:pinned — с подсветкой совпадений.",
-        f4t: "Лимиты 5ч и неделя", f4d: "Расход по каждому аккаунту из официальных CLI — Claude, Codex, agy — со временем сброса и прогнозом темпа. Плюс баланс DeepSeek.",
-        f5t: "Обновляется сам и безопасно", f5d: "Раз в сутки ais проверяет манифест релиза с подписью Ed25519 и ставит новый бинарник только при совпадении SHA-256.",
-        f6t: "Один маленький бинарник", f6d: "Rust, ~6 МБ, без рантайма. macOS (Apple Silicon, Intel), статический Linux (x86_64, arm64) и Windows x64. Английский, русский, французский.",
+        note: "Установит <code>ais</code> (GUI) и <code>ais-cli</code> в ~/.local/bin с проверкой SHA-256.",
+        noteWin: "Установит <code>ais.exe</code> (GUI) и <code>ais-cli.exe</code> в %LOCALAPPDATA%\\ais\\bin, добавит в PATH и создаст ярлык в Пуске.",
+        noteCli: "Установит только терминальный <code>ais-cli</code> в ~/.local/bin с проверкой SHA-256.",
+        noteCliWin: "Установит только терминальный <code>ais-cli.exe</code> в %LOCALAPPDATA%\\ais\\bin и добавит папку в PATH.",
+        guiBadge: "Десктоп GUI",
+        guiDesc: "Нативное окно с GPU-рендерингом для macOS, Windows (ConPTY) и Linux. Без Electron и рантайма.",
+        g1: "До 4 сплит-терминалов на проект (движок alacritty + kitty-клавиши)",
+        g2: "Живые карточки агентов (working / waiting / needs you / error) и системные уведомления",
+        g3: "Отключение любых блоков интерфейса (заголовок, сайдбар, тулбар, карточки агентов, шапки панелей, статус-бар)",
+        g4: "Полноэкранный терминал (⌘⇧↵ / Ctrl+Shift+↵) и системный полноэкранный режим",
+        g5: "Палитра команд (⌘P), 15 тем, дерево файлов с @mention и ежедневное автообновление с подписью",
+        cliBadge: "Терминал CLI и TUI",
+        cliDesc: "Быстрый TUI-браузер (~6 МБ) и локальный индексатор сессий. Удобен по SSH, в Warp и в любом терминале.",
+        c1: "Список или дерево проектов с закреплением, поиском и фильтрами по клиентам",
+        c2: "Запуск в родном каталоге и клиенте одной клавишей с возвратом при выходе",
+        c3: "Лимиты 5ч и неделя по аккаунтам, время сброса, прогноз темпа и баланс DeepSeek",
+        c4: "JSON-вывод (<code>--json</code>, <code>--usage --json</code>), который использует GUI <code>ais</code>",
+        c5: "Ежедневное автообновление с подписью Ed25519 (<code>ais-cli --update</code>) на macOS, Linux и Windows",
+        featuresTitle: "Всё, что вы говорили ИИ, — под рукой",
+        featuresSub: "Только чтение, локально, быстро. Ни ais, ни ais-cli не меняют историю клиентов и никуда её не отправляют.",
+        f1t: "Проекты и панели", f1d: "Список или дерево проектов в ais-cli, или несколько папок со сплит-панелями терминалов в GUI ais.",
+        f2t: "Продолжить с того места", f2d: "Запуск и возобновление Claude, Codex, Gemini, agy, OMP и Pi в их родной папке одним кликом или Enter.",
+        f3t: "Модульные блоки и Zen", f3d: "Включайте и отключайте заголовок, сайдбар, тулбар, карточки агентов, шапки и статус-бар — или откройте терминал на весь экран.",
+        f4t: "Лимиты 5ч и неделя", f4d: "Расход по каждому аккаунту из официальных CLI — Claude, Codex, agy — со временем сброса и прогнозом. Плюс DeepSeek.",
+        f5t: "Безопасное автообновление", f5d: "И ais, и ais-cli раз в сутки проверяют манифест с подписью Ed25519 и SHA-256, заменяя бинарник атомарно.",
+        f6t: "Нативный кроссплатформ", f6d: "Чистый Rust для macOS (Apple Silicon и Intel), Windows x64 (ConPTY) и Linux (X11 / Wayland / musl). EN / RU / FR.",
         usageTitle: "Знайте лимиты заранее",
-        usageSub: "Нажмите U. У каждого аккаунта свой блок: тариф, каталоги конфигурации, локальная активность, расход по каждому окну, время сброса и прогноз, хватит ли лимита. Два входа в Claude — два блока; один вход в двух папках — один блок.",
+        usageSub: "Нажмите ⌘U в ais или U в ais-cli. У каждого аккаунта свой блок: тариф, каталоги, расход по окнам, время сброса и прогноз.",
         keysTitle: "Клавиши",
-        k1: "выбор", k2: "войти в папку · продолжить", k3: "поиск", k4: "текущий каталог / все", k5: "фильтр по клиенту",
-        k6: "новая сессия", k7: "закрепить", k8: "копировать команду / ID", k9: "проекты · сессии · лимиты", k10: "дерево проектов", k11: "язык", k12: "все клавиши",
-        dlTitle: "Загрузки", dlSub: "Хотите вручную? Возьмите бинарник для своей платформы из последнего релиза или соберите через cargo install --path ais-cli.",
+        keysGui: "ais (GUI) — ⌘ на macOS · Ctrl+ на Windows и Linux",
+        keysCli: "ais-cli (Терминальный TUI)",
+        kg1: "палитра команд", kg2: "полноэкранный терминал", kg3: "развернуть панель", kg4: "сплит вправо / вниз",
+        kg5: "новый терминал", kg6: "скрыть/показать карточки агентов", kg7: "сайдбар / лимиты", kg8: "настройки и обновления",
+        k1: "выбор", k2: "войти в папку · продолжить", k3: "поиск", k4: "текущий каталог / все",
+        k5: "фильтр по клиенту", k6: "новая сессия / закрепить", k9: "проекты · сессии · лимиты", k10: "дерево · язык · все клавиши",
+        dlTitle: "Загрузки", dlSub: "Хотите вручную? Скачайте бинарник из последнего релиза на GitHub или соберите из исходников через Cargo.",
+        dlGui: "ais — Десктоп GUI", dlCli: "ais-cli — Терминал CLI и TUI",
         notes: "описание релиза", source: "Исходный код"
       },
       fr: {
-        badge: "Binaire natif · macOS · Linux · Windows",
+        badge: "GUI et CLI natifs · macOS · Windows · Linux",
         title: "Toutes les conversations.<br>Un seul point d’entrée.",
-        lead: "ais retrouve chaque session enregistrée de vos CLI d’IA, les classe par projet avec statut, modèle et dernier message, et reprend n’importe laquelle dans son client et son dossier — en une touche.",
+        lead: "Deux outils Rust rapides pour vos CLI d’IA : <strong>ais</strong> (interface bureau multi-panneaux) et <strong>ais-cli</strong> (TUI terminal léger). Parcourez vos projets, suivez vos limites 5 h/semaine et reprenez toute session en un clic.",
+        edGui: "ais (GUI + CLI)", edCli: "ais-cli (CLI seul)",
         copy: "Copier", copied: "Copié",
-        note: "Choisit la version pour votre OS et votre processeur, vérifie son SHA-256 et l’installe dans ~/.local/bin. Ensuite, lancez simplement <code>ais</code>.",
-        noteWin: "Installe ais.exe dans %LOCALAPPDATA%\\ais\\bin, vérifie son SHA-256 et ajoute le dossier au PATH. Ensuite, lancez simplement <code>ais</code>.",
-        featuresTitle: "Tout ce que vous avez dit à une IA, à une touche",
-        featuresSub: "Lecture seule, locale, rapide. ais ne modifie jamais l’historique des clients et ne l’envoie nulle part.",
-        f1t: "Les projets d’abord", f1d: "Les dossiers avec sessions, par dernière activité, en liste ou en arborescence. Entrée pour entrer, Retour arrière pour revenir.",
-        f2t: "Reprendre là où c’était", f2d: "Entrée lance le CLI d’origine avec son option de reprise native dans le dossier de la session, puis vous ramène à la liste.",
-        f3t: "Une recherche qui comprend", f3d: "Mots, -exclusions et filtres : client:, model:, status:, branch:, dir:, since:3d, is:pinned — avec surlignage.",
-        f4t: "Limites 5 h et hebdo", f4d: "L’usage de chaque compte via les CLI officiels — Claude, Codex, agy — avec l’heure de réinitialisation et une prévision de rythme. Et le solde DeepSeek.",
-        f5t: "Mise à jour automatique et sûre", f5d: "Une fois par jour, ais vérifie un manifeste signé Ed25519 et n’installe le nouveau binaire que si son SHA-256 correspond.",
-        f6t: "Un seul petit binaire", f6d: "Rust, ~6 Mo, sans runtime. macOS (Apple Silicon, Intel), Linux statique (x86_64, arm64) et Windows x64. Anglais, russe, français.",
+        note: "Installe <code>ais</code> (GUI) et <code>ais-cli</code> dans ~/.local/bin avec vérification SHA-256.",
+        noteWin: "Installe <code>ais.exe</code> (GUI) et <code>ais-cli.exe</code> dans %LOCALAPPDATA%\\ais\\bin, ajoute au PATH et crée un raccourci Démarrer.",
+        noteCli: "Installe uniquement le CLI terminal <code>ais-cli</code> dans ~/.local/bin avec vérification SHA-256.",
+        noteCliWin: "Installe uniquement <code>ais-cli.exe</code> dans %LOCALAPPDATA%\\ais\\bin et ajoute le dossier au PATH.",
+        guiBadge: "Application GUI",
+        guiDesc: "Espace de travail natif GPU pour macOS, Windows (ConPTY) et Linux. Sans Electron ni runtime.",
+        g1: "Jusqu’à 4 panneaux terminal par projet (moteur alacritty + touches kitty)",
+        g2: "Pastilles d’agents en direct (working / waiting / needs you / error) et notifications",
+        g3: "Afficher ou masquer chaque bloc (barre de titre, barre latérale, outils, pastilles, en-têtes, statut)",
+        g4: "Terminal plein écran (⌘⇧↵ / Ctrl+Shift+↵) et plein écran système",
+        g5: "Palette de commandes (⌘P), 15 thèmes, explorateur avec @mention, mise à jour signée quotidienne",
+        cliBadge: "Terminal CLI & TUI",
+        cliDesc: "Navigateur TUI rapide (~6 Mo) et indexeur local. Idéal en SSH, dans Warp ou tout terminal.",
+        c1: "Liste plate ou arborescence des projets avec épinglage, recherche et filtres par client",
+        c2: "Reprise en une touche dans le dossier et le client d’origine",
+        c3: "Limites 5 h et hebdomadaires par compte, réinitialisation, prévision et solde DeepSeek",
+        c4: "Sortie JSON (<code>--json</code>, <code>--usage --json</code>) utilisée par <code>ais</code>",
+        c5: "Mise à jour auto signée Ed25519 (<code>ais-cli --update</code>) sur macOS, Linux et Windows",
+        featuresTitle: "Tout ce que vous avez dit à une IA, à portée de main",
+        featuresSub: "Lecture seule, locale, rapide. Ni ais ni ais-cli ne modifient ou n’envoient vos historiques.",
+        f1t: "Projets et panneaux", f1d: "Liste ou arborescence dans ais-cli, ou espaces multi-projets avec terminaux scindés dans ais.",
+        f2t: "Reprendre là où c’était", f2d: "Lancez ou reprenez Claude, Codex, Gemini, agy, OMP ou Pi dans leur dossier en un clic.",
+        f3t: "Blocs modulaires & Zen", f3d: "Affichez ou masquez barre de titre, barre latérale, outils, pastilles ou statut — ou passez en terminal plein écran.",
+        f4t: "Limites 5 h et hebdo", f4d: "Usage par compte via les CLI officiels — Claude, Codex, agy — avec prévision de rythme et solde DeepSeek.",
+        f5t: "Mises à jour sûres", f5d: "ais et ais-cli vérifient chaque jour un manifeste signé Ed25519 et son SHA-256 avant remplacement atomique.",
+        f6t: "Natif multiplateforme", f6d: "Rust pur pour macOS (Apple Silicon & Intel), Windows x64 (ConPTY) et Linux (X11 / Wayland / musl). EN / RU / FR.",
         usageTitle: "Connaître ses limites avant de les atteindre",
-        usageSub: "Appuyez sur U. Chaque compte connecté a son bloc : offre, dossiers de configuration, activité locale, usage par fenêtre, réinitialisation et prévision. Deux connexions Claude restent deux blocs ; une connexion dans deux dossiers n’apparaît qu’une fois.",
-        keysTitle: "Touches",
-        k1: "sélection", k2: "ouvrir le dossier · reprendre", k3: "recherche", k4: "dossier courant / tous", k5: "filtrer par client",
-        k6: "nouvelle session", k7: "épingler", k8: "copier la commande / l’ID", k9: "projets · sessions · usage", k10: "arborescence", k11: "langue", k12: "toutes les touches",
-        dlTitle: "Téléchargements", dlSub: "Installation manuelle ? Prenez le binaire de votre plateforme dans la dernière version, ou compilez avec cargo install --path ais-cli.",
+        usageSub: "Appuyez sur ⌘U dans ais ou U dans ais-cli. Chaque compte a son bloc : offre, dossiers, usage par fenêtre, réinitialisation et prévision.",
+        keysTitle: "Raccourcis",
+        keysGui: "ais (GUI) — ⌘ sur macOS · Ctrl+ sur Windows & Linux",
+        keysCli: "ais-cli (TUI Terminal)",
+        kg1: "palette de commandes", kg2: "terminal plein écran", kg3: "zoomer le panneau", kg4: "scinder à droite / en bas",
+        kg5: "nouveau terminal", kg6: "afficher/masquer les pastilles", kg7: "barre latérale / usage", kg8: "paramètres & mises à jour",
+        k1: "sélection", k2: "ouvrir · reprendre", k3: "recherche", k4: "dossier courant / tous",
+        k5: "filtrer par client", k6: "nouvelle session / épingler", k9: "projets · sessions · usage", k10: "arborescence · langue · aide",
+        dlTitle: "Téléchargements", dlSub: "Installation manuelle ? Téléchargez le binaire de votre plateforme ou compilez avec Cargo.",
+        dlGui: "ais — Application GUI", dlCli: "ais-cli — Terminal CLI & TUI",
         notes: "notes de version", source: "Code source"
       }
     };
     const COMMANDS = {
-      unix: { prompt: "$", cmd: "curl -fsSL https://ais.repentandliveholy.org/install.sh | sh" },
-      win: { prompt: "PS>", cmd: "irm https://ais.repentandliveholy.org/install.ps1 | iex" }
+      gui: {
+        unix: { prompt: "$", cmd: "curl -fsSL https://ais.repentandliveholy.org/install.sh | sh", noteKey: "note" },
+        win:  { prompt: "PS>", cmd: "irm https://ais.repentandliveholy.org/install.ps1 | iex", noteKey: "noteWin" }
+      },
+      cli: {
+        unix: { prompt: "$", cmd: "curl -fsSL https://ais.repentandliveholy.org/install-cli.sh | sh", noteKey: "noteCli" },
+        win:  { prompt: "PS>", cmd: "irm https://ais.repentandliveholy.org/install-cli.ps1 | iex", noteKey: "noteCliWin" }
+      }
     };
     const english = {};
     document.querySelectorAll("[data-i18n]").forEach(el => { english[el.dataset.i18n] = el.innerHTML; });
     english.copied = "Copied";
-    english.noteWin = "Installs ais.exe to %LOCALAPPDATA%\\ais\\bin, verifies its SHA-256 and adds the folder to PATH. Then just run <code>ais</code>.";
-    let lang = "en", os = /Win/.test(navigator.platform) ? "win" : "unix";
+    english.noteWin = "Installs <code>ais.exe</code> (GUI) and <code>ais-cli.exe</code> to %LOCALAPPDATA%\\ais\\bin, adds to PATH, and creates a Start Menu shortcut.";
+    english.noteCli = "Installs only the terminal <code>ais-cli</code> binary to ~/.local/bin with SHA-256 verification.";
+    english.noteCliWin = "Installs only <code>ais-cli.exe</code> to %LOCALAPPDATA%\\ais\\bin and adds the folder to PATH.";
+    let lang = "en", os = /Win/.test(navigator.platform) ? "win" : "unix", edition = "gui";
     const t = key => (I18N[lang] && I18N[lang][key]) || english[key];
     function store(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
     function recall(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
@@ -352,20 +468,22 @@
       document.documentElement.lang = lang;
       document.querySelectorAll("[data-i18n]").forEach(el => { el.innerHTML = t(el.dataset.i18n); });
       document.querySelectorAll(".lang button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
-      applyOs(os);
+      applyInstall();
       store("ais-lang", lang);
     }
-    function applyOs(next) {
-      os = next;
-      document.getElementById("prompt").textContent = COMMANDS[os].prompt;
-      document.getElementById("cmd").textContent = COMMANDS[os].cmd;
-      document.querySelector(".note").innerHTML = os === "win" ? t("noteWin") : t("note");
+    function applyInstall() {
+      const entry = COMMANDS[edition][os];
+      document.getElementById("prompt").textContent = entry.prompt;
+      document.getElementById("cmd").textContent = entry.cmd;
+      document.getElementById("installNote").innerHTML = t(entry.noteKey);
       document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.os === os)));
+      document.querySelectorAll(".editions button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.ed === edition)));
     }
     document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => applyLang(b.dataset.lang)));
-    document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => applyOs(b.dataset.os)));
+    document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => { os = b.dataset.os; applyInstall(); }));
+    document.querySelectorAll(".editions button").forEach(b => b.addEventListener("click", () => { edition = b.dataset.ed; applyInstall(); }));
     document.getElementById("copy").addEventListener("click", async e => {
-      try { await navigator.clipboard.writeText(COMMANDS[os].cmd); } catch (err) {}
+      try { await navigator.clipboard.writeText(COMMANDS[edition][os].cmd); } catch (err) {}
       e.target.textContent = t("copied");
       setTimeout(() => { e.target.textContent = t("copy"); }, 1500);
     });
@@ -380,9 +498,15 @@
     const wanted = new URLSearchParams(location.search).get("lang") || recall("ais-lang") ||
       ((navigator.language || "en").slice(0, 2));
     applyLang(wanted);
-    fetch("releases/latest.json").then(r => r.ok ? r.json() : null).then(m => {
-      if (m && m.version) document.getElementById("version").textContent = "· v" + m.version;
-    }).catch(() => {});
+    Promise.all([
+      fetch("releases/ais-gui-latest.json").then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch("releases/latest.json").then(r => r.ok ? r.json() : null).catch(() => null)
+    ]).then(([gui, cli]) => {
+      const parts = [];
+      if (gui && gui.version) parts.push("GUI v" + gui.version);
+      if (cli && cli.version) parts.push("CLI v" + cli.version);
+      if (parts.length) document.getElementById("version").textContent = "· " + parts.join(" · ");
+    });
   </script>
 </body>
 </html>

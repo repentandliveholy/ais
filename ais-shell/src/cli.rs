@@ -140,17 +140,38 @@ impl CliKind {
     }
 }
 
-/// The user's home directory (`$HOME`).
+/// The user's home directory (`$HOME` on Unix, `%USERPROFILE%` on Windows).
 pub fn home_dir() -> PathBuf {
-    env::var_os("HOME")
-        .or_else(|| env::var_os("USERPROFILE"))
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
+    #[cfg(windows)]
+    let var = env::var_os("USERPROFILE").or_else(|| env::var_os("HOME"));
+    #[cfg(not(windows))]
+    let var = env::var_os("HOME");
+    var.map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."))
 }
 
-/// Canonicalizes a path consistently when possible.
+/// Canonicalizes a path consistently when possible (stripping Windows `\\?\`).
 pub fn canonical_path(path: &Path) -> PathBuf {
-    fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    let resolved = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    #[cfg(windows)]
+    {
+        let text = resolved.to_string_lossy();
+        if let Some(rest) = text.strip_prefix(r"\\?\")
+            && !rest.starts_with("UNC")
+        {
+            return PathBuf::from(rest);
+        }
+    }
+    resolved
+}
+
+/// Hides the console window when spawning background helper commands on Windows.
+pub fn no_window(command: &mut std::process::Command) -> &mut std::process::Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000);
+    }
+    command
 }
 
 /// Seconds since the Unix epoch → `SystemTime`. `None` for zero, negative,
@@ -164,7 +185,7 @@ pub fn unix_time(seconds: f64) -> Option<std::time::SystemTime> {
 }
 
 pub fn which(command: &str) -> Option<PathBuf> {
-    let expanded = if let Some(rest) = command.strip_prefix("~/") {
+    let expanded = if let Some(rest) = command.strip_prefix("~/").or_else(|| command.strip_prefix("~\\")) {
         home_dir().join(rest)
     } else {
         PathBuf::from(command)
@@ -173,13 +194,49 @@ pub fn which(command: &str) -> Option<PathBuf> {
         return executable(&expanded).then_some(expanded);
     }
     let path = env::var_os("PATH")?;
+    #[cfg(windows)]
+    let extensions: Vec<String> = env::var("PATHEXT")
+        .unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into())
+        .split(';')
+        .map(|s| s.to_ascii_lowercase())
+        .collect();
     for dir in env::split_paths(&path) {
-        let direct = dir.join(command);
-        if executable(&direct) {
-            return Some(direct);
+        #[cfg(windows)]
+        if let Some(found) = windows_candidate(&dir, command, &extensions) {
+            return Some(found);
+        }
+        #[cfg(not(windows))]
+        {
+            let direct = dir.join(command);
+            if executable(&direct) {
+                return Some(direct);
+            }
         }
     }
     None
+}
+
+/// npm installs `codex` (a POSIX shell script), `codex.cmd` and `codex.ps1`
+/// side by side. Prefer `PATHEXT` matches and accept a bare name only when it
+/// already carries an executable extension.
+#[cfg(any(windows, test))]
+fn windows_candidate(dir: &Path, binary: &str, extensions: &[String]) -> Option<PathBuf> {
+    for ext in extensions {
+        if ext.is_empty() {
+            continue;
+        }
+        let with = dir.join(format!("{binary}{ext}"));
+        if with.is_file() {
+            return Some(with);
+        }
+    }
+    let full = dir.join(binary);
+    let lower = binary.to_ascii_lowercase();
+    (full.is_file()
+        && extensions
+            .iter()
+            .any(|ext| !ext.is_empty() && lower.ends_with(ext.as_str())))
+    .then_some(full)
 }
 
 fn executable(path: &Path) -> bool {
@@ -218,5 +275,23 @@ mod tests {
             assert_eq!(CliKind::from_id(kind.id()), Some(kind));
         }
         assert_eq!(CliKind::from_id("shell"), None);
+    }
+
+    #[test]
+    fn windows_which_skips_npm_shell_shim() {
+        let dir = std::env::temp_dir().join(format!("ais-shell-which-{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        for name in ["codex", "codex.cmd", "codex.ps1", "tool.exe", "script"] {
+            fs::write(dir.join(name), "").unwrap();
+        }
+        let exts: Vec<String> = [".com", ".exe", ".bat", ".cmd"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        assert_eq!(windows_candidate(&dir, "codex", &exts), Some(dir.join("codex.cmd")));
+        assert_eq!(windows_candidate(&dir, "tool.exe", &exts), Some(dir.join("tool.exe")));
+        assert_eq!(windows_candidate(&dir, "tool", &exts), Some(dir.join("tool.exe")));
+        assert_eq!(windows_candidate(&dir, "script", &exts), None);
+        let _ = fs::remove_dir_all(dir);
     }
 }

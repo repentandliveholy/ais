@@ -7,6 +7,8 @@
 //! TUI layers of Claude Code, Codex, Gemini and OMP rely on.
 
 use crate::cli::CliKind;
+#[cfg(windows)]
+use crate::cli::which;
 use alacritty_terminal::event::{Event, EventListener, WindowSize};
 use alacritty_terminal::grid::{Dimensions, Scroll};
 use alacritty_terminal::index::{Column, Line, Point, Side};
@@ -401,8 +403,7 @@ impl TerminalPane {
                 pixel_height: 0,
             })
             .map_err(|error| format!("Cannot open PTY: {error}"))?;
-        let mut command = CommandBuilder::new(&spec.program);
-        command.args(&spec.args);
+        let mut command = build_pty_command(&spec);
         command.cwd(&spec.cwd);
         apply_child_env(&mut command);
         let child = pair
@@ -838,14 +839,81 @@ impl Drop for TerminalPane {
     }
 }
 
+/// Resolves `.cmd` / `.bat` wrappers on Windows so `CreateProcessW` via
+/// ConPTY can run npm-installed CLIs (`claude.cmd`, `codex.cmd`, etc.).
+fn build_pty_command(spec: &LaunchSpec) -> CommandBuilder {
+    #[cfg(windows)]
+    {
+        let resolved = which(&spec.program).unwrap_or_else(|| PathBuf::from(&spec.program));
+        let ext = resolved
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase);
+        if matches!(ext.as_deref(), Some("cmd" | "bat")) {
+            let comspec = env::var("ComSpec").unwrap_or_else(|_| "cmd.exe".to_string());
+            let mut command = CommandBuilder::new(comspec);
+            command.arg("/C");
+            command.arg(resolved);
+            command.args(&spec.args);
+            return command;
+        }
+        let mut command = CommandBuilder::new(resolved);
+        command.args(&spec.args);
+        command
+    }
+    #[cfg(not(windows))]
+    {
+        let mut command = CommandBuilder::new(&spec.program);
+        command.args(&spec.args);
+        command
+    }
+}
+
 /// The login shell used for "Terminal" panes.
 pub fn user_shell() -> String {
-    env::var_os("SHELL")
-        .map(PathBuf::from)
-        .filter(|path| path.is_file())
-        .unwrap_or_else(|| PathBuf::from("/bin/sh"))
-        .to_string_lossy()
-        .into_owned()
+    #[cfg(windows)]
+    {
+        if let Some(shell) = env::var_os("AIS_SHELL")
+            .or_else(|| env::var_os("SHELL"))
+            .map(PathBuf::from)
+            .filter(|path| path.is_file())
+        {
+            return shell.to_string_lossy().into_owned();
+        }
+        for candidate in ["pwsh", "powershell"] {
+            if let Some(found) = which(candidate) {
+                return found.to_string_lossy().into_owned();
+            }
+        }
+        env::var("ComSpec").unwrap_or_else(|_| "cmd.exe".into())
+    }
+    #[cfg(not(windows))]
+    {
+        env::var_os("SHELL")
+            .map(PathBuf::from)
+            .filter(|path| path.is_file())
+            .unwrap_or_else(|| PathBuf::from("/bin/sh"))
+            .to_string_lossy()
+            .into_owned()
+    }
+}
+
+/// Default interactive flags for `user_shell()`.
+pub fn shell_args(shell: &str) -> Vec<String> {
+    let name = Path::new(shell)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(str::to_ascii_lowercase)
+        .unwrap_or_default();
+    if cfg!(windows) {
+        match name.as_str() {
+            "pwsh" | "powershell" => vec!["-NoLogo".into()],
+            "bash" | "zsh" | "fish" => vec!["-l".into()],
+            _ => Vec::new(),
+        }
+    } else {
+        vec!["-l".into()]
+    }
 }
 
 fn apply_child_env(command: &mut CommandBuilder) {

@@ -230,10 +230,21 @@ pub fn encode_mouse(
 
 /// Quotes a path for pasting into a shell or CLI prompt.
 pub fn shell_quote(path: &str) -> String {
-    if !path.is_empty() && path.chars().all(|c| c.is_alphanumeric() || "/._-+:@%,~".contains(c)) {
-        path.to_string()
-    } else {
-        format!("'{}'", path.replace('\'', "'\\''"))
+    #[cfg(windows)]
+    {
+        if !path.is_empty() && path.chars().all(|c| c.is_alphanumeric() || "\\/._-+:~".contains(c)) {
+            path.to_string()
+        } else {
+            format!("\"{}\"", path.replace('"', "\\\""))
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        if !path.is_empty() && path.chars().all(|c| c.is_alphanumeric() || "/._-+:@%,~".contains(c)) {
+            path.to_string()
+        } else {
+            format!("'{}'", path.replace('\'', "'\\''"))
+        }
     }
 }
 

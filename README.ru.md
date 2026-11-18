@@ -8,23 +8,32 @@
 
 ## Установка
 
-ais — один нативный бинарник (Rust) для **macOS, Linux и Windows**. Без рантайма и зависимостей.
+Два нативных бинарника (Rust) для **macOS, Linux и Windows**. Без рантайма и зависимостей:
+- **`ais`** — нативное десктопное GUI-приложение (мультипанельный терминал, карточки агентов, отключаемые блоки, полноэкранный терминал, панель лимитов, возобновление сессий)
+- **`ais-cli`** — консольный TUI-браузер сессий и лимитов (также работает как быстрый индексатор для GUI `ais`)
 
-**macOS / Linux**
+**macOS / Linux (`ais` GUI + `ais-cli`)**
 
 ```sh
 curl -fsSL https://ais.repentandliveholy.org/install.sh | sh
 ```
 
-**Windows (PowerShell)**
+**Windows PowerShell (`ais` GUI + `ais-cli`)**
 
 ```powershell
 irm https://ais.repentandliveholy.org/install.ps1 | iex
 ```
 
+**Только CLI (`ais-cli`)**
+
+```sh
+curl -fsSL https://ais.repentandliveholy.org/install-cli.sh | sh   # macOS / Linux
+irm https://ais.repentandliveholy.org/install-cli.ps1 | iex       # Windows PowerShell
+```
+
 Зеркало без сайта: `curl -fsSL https://github.com/repentandliveholy/ais/releases/latest/download/install.sh | sh`.
 
-Установщик выбирает сборку под вашу ОС и процессор (Apple Silicon / Intel, Linux x86_64 / arm64 — статический musl, Windows x64), сверяет SHA-256 с `SHA256SUMS` релиза и ставит в `~/.local/bin` (`%LOCALAPPDATA%\ais\bin` на Windows). Бинарники также лежат в каждом [релизе на GitHub](https://github.com/repentandliveholy/ais/releases). Из исходников: `cargo install --path ais-cli`.
+Установщик выбирает сборку под вашу ОС и процессор (Apple Silicon / Intel, Linux x86_64 / arm64, Windows x64), сверяет SHA-256 с `SHA256SUMS` релиза и ставит в `~/.local/bin` (`%LOCALAPPDATA%\ais\bin` на Windows). Бинарники также лежат в каждом [релизе на GitHub](https://github.com/repentandliveholy/ais/releases). Из исходников: `cargo install --path ais-cli` (CLI) или `cd ais-shell && cargo build --release` (GUI).
 
 ### Обновления
 
@@ -54,7 +63,7 @@ ais
 
 Для прямого запуска без возврата: `ais --no-return`. При использовании `--new` и `--resume` в обычном терминале возврат тоже включён; в скриптах без TTY сохраняется однократный запуск.
 
-**Десктоп-приложение:** [`ais-shell/`](ais-shell/README.md) — нативное окно для тех же историй: живой статус каждого CLI (работает / ждёт ввода / нужен вы / ошибка), панель лимитов 5ч/неделя, возобновление разговора в один клик, настоящий терминал (движок alacritty, kitty-клавиши, мышь, bracketed paste) с делением на панели и палитра команд ⌘P. `./ais-shell/bundle.sh --install` собирает `ais.app`.
+**Десктоп-приложение (`ais`):** [`ais-shell/`](ais-shell/README.md) — нативное окно для **macOS, Windows и Linux**: живой статус каждого CLI (работает / ждёт ввода / нужен вы / ошибка), панель лимитов 5ч/неделя, возобновление разговора в один клик, настоящий терминал (движок alacritty + ConPTY на Windows, kitty-клавиши, мышь, bracketed paste) с делением на панели, быстрое скрытие любых блоков интерфейса, полноэкранный терминал (`⌘⇧↵` / `Ctrl+Shift+↵`), автообновление с подписью Ed25519 и палитра команд `⌘P`. `./ais-shell/bundle.sh --install` собирает `ais.app`.
 
 **Проекты** — стартовый экран: плоский список папок с сохранёнными сессиями, упорядоченный по последней активности, как было раньше. `T` переключает дерево, где подпапки показываются внутри родительской папки с направляющими. `Enter` на папке с подпроектами входит в неё: показываются прямые подпапки с сессиями и сессии самой папки. `Enter` на конечной папке открывает её сессии; на сессии — продолжает диалог. `O` сразу открывает сессии выбранной папки. `Esc` или `Backspace` поднимает на уровень выше и затем возвращает к корню проектов. На странице работают поиск и фильтр клиентов. Полные пути различают одноимённые папки; сессии без каталога собраны в отдельную группу.
 

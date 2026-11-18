@@ -1,10 +1,11 @@
-# ais · AI Sessions installer for Windows (PowerShell 5+).
+﻿# ais · AI Sessions installer for Windows (PowerShell 5+).
 #
 #   irm https://ais.repentandliveholy.org/install.ps1 | iex
 #
-# Downloads ais.exe from the latest GitHub release, checks its SHA-256 against
-# the release SHA256SUMS, installs it to %LOCALAPPDATA%\ais\bin and adds that
-# folder to the user PATH. ais then keeps itself up to date.
+# Downloads `ais.exe` (GUI) and `ais-cli.exe` (CLI/indexer) from the latest
+# GitHub release, checks SHA-256 against SHA256SUMS, installs to
+# %LOCALAPPDATA%\ais\bin, adds that folder to user PATH, and creates a Start Menu
+# shortcut for `ais`.
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
@@ -13,23 +14,31 @@ $Dir = if ($env:AIS_INSTALL_DIR) { $env:AIS_INSTALL_DIR } else { Join-Path $env:
 $Version = if ($env:AIS_VERSION) { $env:AIS_VERSION } else { 'latest' }
 
 if (-not [Environment]::Is64BitOperatingSystem) { throw 'ais requires 64-bit Windows' }
-$Asset = 'ais-x86_64-pc-windows-gnu.exe'
+$GuiAsset = 'ais-gui-x86_64-pc-windows-msvc.exe'
+$CliAsset = 'ais-x86_64-pc-windows-gnu.exe'
 $Base = if ($Version -eq 'latest') { "$Repo/releases/latest/download" } else { "$Repo/releases/download/v$($Version.TrimStart('v'))" }
 
 $Tmp = Join-Path ([IO.Path]::GetTempPath()) ("ais-" + [Guid]::NewGuid())
 New-Item -ItemType Directory -Path $Tmp | Out-Null
 try {
-    Write-Host "Downloading $Asset..."
-    Invoke-WebRequest -UseBasicParsing "$Base/$Asset" -OutFile "$Tmp\ais.exe"
     Invoke-WebRequest -UseBasicParsing "$Base/SHA256SUMS" -OutFile "$Tmp\SHA256SUMS"
-    $Line = Get-Content "$Tmp\SHA256SUMS" | Where-Object { $_ -match "\s\*?$([Regex]::Escape($Asset))$" } | Select-Object -First 1
-    if (-not $Line) { throw "$Asset is missing from SHA256SUMS" }
-    $Expected = ($Line -split '\s+')[0].ToLower()
-    $Actual = (Get-FileHash "$Tmp\ais.exe" -Algorithm SHA256).Hash.ToLower()
-    if ($Expected -ne $Actual) { throw "checksum mismatch for $Asset" }
+    $Sums = Get-Content "$Tmp\SHA256SUMS"
 
-    New-Item -ItemType Directory -Force -Path $Dir | Out-Null
-    Move-Item -Force "$Tmp\ais.exe" (Join-Path $Dir 'ais.exe')
+    function Install-Verified($Asset, $DestName) {
+        $OutFile = Join-Path $Tmp $DestName
+        Write-Host "Downloading $Asset..."
+        Invoke-WebRequest -UseBasicParsing "$Base/$Asset" -OutFile $OutFile
+        $Line = $Sums | Where-Object { $_ -match "\s\*?$([Regex]::Escape($Asset))$" } | Select-Object -First 1
+        if (-not $Line) { throw "$Asset is missing from SHA256SUMS" }
+        $Expected = ($Line -split '\s+')[0].ToLower()
+        $Actual = (Get-FileHash $OutFile -Algorithm SHA256).Hash.ToLower()
+        if ($Expected -ne $Actual) { throw "checksum mismatch for $Asset" }
+        New-Item -ItemType Directory -Force -Path $Dir | Out-Null
+        Move-Item -Force $OutFile (Join-Path $Dir $DestName)
+    }
+
+    Install-Verified $GuiAsset 'ais.exe'
+    Install-Verified $CliAsset 'ais-cli.exe'
 } finally {
     Remove-Item -Recurse -Force $Tmp -ErrorAction SilentlyContinue
 }
@@ -40,5 +49,19 @@ if (-not (($UserPath -split ';') -contains $Dir)) {
     $env:Path = "$env:Path;$Dir"
     Write-Host "Added $Dir to your user PATH (open a new terminal to use it everywhere)."
 }
-& (Join-Path $Dir 'ais.exe') --version
-Write-Host 'Run: ais'
+
+try {
+    $Programs = [Environment]::GetFolderPath('Programs')
+    if ($Programs) {
+        $Shell = New-Object -ComObject WScript.Shell
+        $Shortcut = $Shell.CreateShortcut((Join-Path $Programs 'ais.lnk'))
+        $Shortcut.TargetPath = Join-Path $Dir 'ais.exe'
+        $Shortcut.WorkingDirectory = $env:USERPROFILE
+        $Shortcut.Description = 'ais · AI Sessions'
+        $Shortcut.Save()
+    }
+} catch {}
+
+& (Join-Path $Dir 'ais-cli.exe') --version
+Write-Host "Installed ais (GUI) and ais-cli (CLI) to $Dir"
+Write-Host 'Run: ais (GUI) or ais-cli (terminal)'

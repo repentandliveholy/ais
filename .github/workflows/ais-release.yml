@@ -1,7 +1,8 @@
 name: ais release
 
-# Push a tag like v0.4.1 (matching ais-cli/Cargo.toml) to publish binaries,
-# the signed update manifest and the installers as a GitHub release.
+# Push a tag like v0.4.4 (matching ais-cli/Cargo.toml) to publish both
+# `ais` (desktop GUI) and `ais-cli` (terminal CLI/TUI) binaries, signed update
+# manifests, and installers as a GitHub release.
 on:
   push:
     tags: ["v*"]
@@ -22,7 +23,7 @@ jobs:
         with:
           toolchain: "1.92"
           targets: ${{ matrix.target }}
-      - name: Build
+      - name: Build ais-cli
         working-directory: ais-cli
         env:
           MACOSX_DEPLOYMENT_TARGET: "11.0"
@@ -31,14 +32,22 @@ jobs:
           cargo build --release --locked --target ${{ matrix.target }}
           mkdir -p ../dist
           cp target/${{ matrix.target }}/release/ais ../dist/ais-${{ matrix.target }}
+      - name: Build ais (GUI)
+        working-directory: ais-shell
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=. --remap-path-prefix=$HOME=."
+          cargo build --release --locked --target ${{ matrix.target }}
+          mkdir -p ../dist
+          cp target/${{ matrix.target }}/release/ais ../dist/ais-gui-${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
-          name: ais-${{ matrix.target }}
+          name: macos-${{ matrix.target }}
           path: dist/*
 
   zig:
-    # Linux (static musl) and Windows (GNU) cross builds, identical to the
-    # release machine's cargo-zigbuild setup.
+    # Linux (static musl) and Windows (GNU) cross builds for ais-cli.
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -53,7 +62,7 @@ jobs:
         run: |
           pip install ziglang==0.13.0
           cargo install --locked cargo-zigbuild
-      - name: Build
+      - name: Build ais-cli
         working-directory: ais-cli
         run: |
           export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=. --remap-path-prefix=$HOME=."
@@ -66,11 +75,56 @@ jobs:
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: ais-${{ matrix.target }}
+          name: cli-${{ matrix.target }}
+          path: dist/*
+
+  gui-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.92"
+          targets: x86_64-unknown-linux-gnu
+      - name: Install Linux system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev libgl1-mesa-dev libgtk-3-dev
+      - name: Build ais (GUI)
+        working-directory: ais-shell
+        run: |
+          export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=. --remap-path-prefix=$HOME=."
+          cargo build --release --locked --target x86_64-unknown-linux-gnu
+          mkdir -p ../dist
+          cp target/x86_64-unknown-linux-gnu/release/ais ../dist/ais-gui-x86_64-unknown-linux-gnu
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gui-linux
+          path: dist/*
+
+  gui-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.92"
+          targets: x86_64-pc-windows-msvc
+      - name: Build ais (GUI)
+        working-directory: ais-shell
+        shell: bash
+        run: |
+          export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=. --remap-path-prefix=$HOME=."
+          cargo build --release --locked --target x86_64-pc-windows-msvc
+          mkdir -p ../dist
+          cp target/x86_64-pc-windows-msvc/release/ais.exe ../dist/ais-gui-x86_64-pc-windows-msvc.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gui-windows
           path: dist/*
 
   publish:
-    needs: [macos, zig]
+    needs: [macos, zig, gui-linux, gui-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -82,7 +136,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' ais-cli/Cargo.toml | head -1)
-          # A release published from verified local builds is never overwritten.
           if gh release view "v$VERSION" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "SKIP=true" >> "$GITHUB_ENV"
             echo "Release v$VERSION already exists; keeping its assets."
@@ -92,22 +145,26 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      - name: Manifest, checksums and signature
+      - name: Manifests, checksums and signatures
         if: env.SKIP != 'true'
         env:
           AIS_SIGNING_KEY: ${{ secrets.AIS_SIGNING_KEY }}
         run: |
           VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' ais-cli/Cargo.toml | head -1)
+          GUI_VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' ais-shell/Cargo.toml | head -1)
           test "v$VERSION" = "${GITHUB_REF_NAME}" || test "${GITHUB_EVENT_NAME}" = workflow_dispatch
           python3 ais-cli/release/make-manifest.py "$VERSION" dist
+          python3 ais-shell/release/make-manifest.py "$GUI_VERSION" "$VERSION" dist
           (cd ais-cli && cargo run --quiet --release --example release_sign -- sign - ../dist/latest.json)
-          cp ais-cli/release/install.sh ais-cli/release/install.ps1 dist/
+          (cd ais-cli && cargo run --quiet --release --example release_sign -- sign - ../dist/ais-gui-latest.json)
+          cp ais-cli/release/install.sh ais-cli/release/install.ps1 ais-cli/release/install-cli.sh ais-cli/release/install-cli.ps1 dist/
           (cd dist && sha256sum ais-* > SHA256SUMS)
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "GUI_VERSION=$GUI_VERSION" >> "$GITHUB_ENV"
       - name: GitHub release
         if: env.SKIP != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v$VERSION" dist/* --title "ais $VERSION" \
+          gh release create "v$VERSION" dist/* --title "ais $GUI_VERSION · ais-cli $VERSION" \
             --notes-file ais-cli/release/notes.md --verify-tag

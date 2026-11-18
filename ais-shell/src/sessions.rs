@@ -1,13 +1,14 @@
 //! Per-project conversation lists, read through the `ais` indexer
 //! (`ais --json -C <project>`), and the argv that resumes each of them.
 
-use crate::cli::{CliKind, unix_time, which};
+use crate::cli::{CliKind, no_window, unix_time, which};
 use crate::log;
 use crate::terminal::LaunchSpec;
 use crate::usage::wait_with_timeout;
 use serde_json::Value;
 use std::collections::{HashMap, VecDeque};
 use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
@@ -191,34 +192,61 @@ pub fn truncate(text: &str, max: usize) -> String {
     out
 }
 
-/// Locates the `ais` CLI: `$AIS_BIN`, then `PATH`, then beside the
-/// executable (or bundle Resources), and in debug builds the sibling repo copy.
+/// Locates `ais-cli` (or legacy `ais` CLI binary, never this GUI executable):
+/// `$AIS_BIN`, then `PATH`, then beside the executable (or bundle Resources /
+/// Windows install dir), and in debug builds the sibling repo copy.
 pub fn find_ais() -> Option<PathBuf> {
-    if let Some(path) = env::var_os("AIS_BIN").map(PathBuf::from)
-        && path.is_file()
-    {
+    let self_exe = env::current_exe().ok().map(|p| fs::canonicalize(&p).unwrap_or(p));
+    let valid = |path: PathBuf| -> Option<PathBuf> {
+        if !path.is_file() {
+            return None;
+        }
+        let canon = fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+        if self_exe.as_ref().is_some_and(|me| *me == canon) {
+            return None;
+        }
+        Some(path)
+    };
+    if let Some(path) = env::var_os("AIS_BIN").map(PathBuf::from).and_then(valid) {
         return Some(path);
     }
-    if let Some(path) = which("ais") {
-        return Some(path);
+    for name in ["ais-cli", "ais"] {
+        if let Some(found) = which(name).and_then(valid) {
+            return Some(found);
+        }
     }
+    let exe_names: &[&str] = if cfg!(windows) {
+        &["ais-cli.exe", "ais.exe"]
+    } else {
+        &["ais-cli", "ais"]
+    };
     if let Ok(exe) = env::current_exe()
         && let Some(dir) = exe.parent()
     {
-        let beside = dir.join("ais");
-        if beside.is_file() {
-            return Some(beside);
+        for name in exe_names {
+            if let Some(found) = valid(dir.join(name)) {
+                return Some(found);
+            }
+            if let Some(found) = valid(dir.join("../Resources").join(name)) {
+                return Some(found.canonicalize().unwrap_or(found));
+            }
         }
-        let resources = dir.join("../Resources/ais");
-        if resources.is_file() {
-            return Some(resources.canonicalize().unwrap_or(resources));
+    }
+    #[cfg(windows)]
+    if let Some(local) = env::var_os("LOCALAPPDATA").map(PathBuf::from) {
+        for name in exe_names {
+            if let Some(found) = valid(local.join("ais/bin").join(name)) {
+                return Some(found);
+            }
         }
     }
     #[cfg(debug_assertions)]
     {
-        let sibling = Path::new(env!("CARGO_MANIFEST_DIR")).join("../ais");
-        if sibling.is_file() {
-            return Some(sibling.canonicalize().unwrap_or(sibling));
+        for name in exe_names {
+            let sibling = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(name);
+            if let Some(found) = valid(sibling) {
+                return Some(found.canonicalize().unwrap_or(found));
+            }
         }
     }
     None
@@ -366,7 +394,8 @@ impl SessionStore {
 }
 
 fn load(ais: &Path, project: &Path) -> Result<Vec<Session>, String> {
-    let child = Command::new(ais)
+    let mut command = Command::new(ais);
+    command
         .arg("--json")
         .arg("-C")
         .arg(project)
@@ -374,9 +403,9 @@ fn load(ais: &Path, project: &Path) -> Result<Vec<Session>, String> {
         .env("NO_COLOR", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("Cannot run ais: {error}"))?;
+        .stderr(Stdio::piped());
+    no_window(&mut command);
+    let child = command.spawn().map_err(|error| format!("Cannot run ais: {error}"))?;
     let output = wait_with_timeout(child, SESSIONS_TIMEOUT, "ais --json")?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

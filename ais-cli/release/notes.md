@@ -1,10 +1,18 @@
-**ais 0.4.3**
+**ais 0.2.0 (GUI) & ais-cli 0.4.4 (CLI)**
 
-- **Smooth, fast scrolling:** the list no longer re-filters, re-sorts and re-groups every session on each scroll step. A frame on the Projects tab dropped from ~45 ms to ~1–3 ms (Sessions: ~5 ms → <1 ms) on a history of ~1800 sessions, so wheel and trackpad scrolling no longer stalls or jumps, even on a busy machine.
+- **Desktop GUI (`ais`) for Windows, macOS, and Linux:** multi-pane native terminal workspace, live agent pills, usage panel, session resume, easy per-block visibility toggles, fullscreen terminal mode (`⌘⇧↵` / `Ctrl+Shift+↵`), and Ed25519-signed daily auto-updates (`ais --update`).
+- **Terminal CLI (`ais-cli`):** fast local session browser, search, and usage monitor for macOS, Linux, and Windows.
 
-Install or upgrade (installed copies update themselves within a day; `ais --update` updates now):
+Install **ais** (GUI + `ais-cli`):
 
 ```sh
 curl -fsSL https://ais.repentandliveholy.org/install.sh | sh      # macOS / Linux
 irm https://ais.repentandliveholy.org/install.ps1 | iex          # Windows PowerShell
+```
+
+Install **ais-cli** only (headless / terminal):
+
+```sh
+curl -fsSL https://ais.repentandliveholy.org/install-cli.sh | sh  # macOS / Linux
+irm https://ais.repentandliveholy.org/install-cli.ps1 | iex      # Windows PowerShell
 ```

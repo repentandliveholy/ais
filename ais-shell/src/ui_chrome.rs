@@ -6,10 +6,11 @@ use crate::keys::{Command as Cmd, MOD};
 use crate::sessions::truncate;
 use crate::terminal::TerminalPane;
 use crate::theme::{Palette, scale};
+use crate::update::UpdateStatus;
 use crate::usage::Limit;
 use crate::widgets::{
-    UiIcon, close_button, kind_color, paint_logo, plural, pretty_path, read_git_branch, theme_button, tool_button,
-    tool_button_tinted, usage_badge, window_buttons,
+    UiIcon, close_button, kind_color, paint_logo, plural, pretty_path, read_git_branch, small_button, theme_button,
+    tool_button, tool_button_tinted, usage_badge, window_buttons,
 };
 use eframe::egui::{
     self, Align, Color32, CornerRadius, FontId, Id, Layout, Margin, Pos2, Rect, RichText, Sense, Stroke, Vec2,
@@ -97,9 +98,9 @@ impl AisApp {
                         );
                     } else {
                         let right_width = if compact {
-                            4.0 * 36.0 + 8.0
+                            5.0 * 36.0 + 8.0
                         } else {
-                            160.0 + 3.0 * 36.0 + 16.0
+                            160.0 + 4.0 * 36.0 + 16.0
                         };
                         let tabs_width = (ui.available_width() - right_width).max(80.0);
                         ui.allocate_ui_with_layout(
@@ -156,6 +157,14 @@ impl AisApp {
 
     fn title_controls(&mut self, ui: &mut egui::Ui, palette: &Palette) {
         let show_icons = self.settings.show_icons;
+        if let UpdateStatus::Updated(version) = &self.update_status
+            && ui
+                .add(small_button(&format!("↻ v{version}"), palette))
+                .on_hover_text(format!("ais updated to v{version} — click to restart"))
+                .clicked()
+        {
+            self.actions.push(Action::RestartToUpdate);
+        }
         if theme_button(ui, palette, self.settings.theme)
             .on_hover_text(format!(
                 "Appearance: {} — click for {}  {}",
@@ -172,6 +181,48 @@ impl AisApp {
             .clicked()
         {
             self.actions.push(Action::OpenSettings);
+        }
+        let blocks_btn = tool_button(
+            ui,
+            UiIcon::Layout,
+            "",
+            !self.settings.show_agents
+                || !self.settings.show_toolbar
+                || !self.settings.show_pane_headers
+                || !self.settings.show_status_bar,
+            show_icons,
+            palette,
+        )
+        .on_hover_text("Toggle UI blocks & fullscreen terminal");
+        let popup_id = Id::new("title-blocks-popup");
+        if blocks_btn.clicked() {
+            ui.memory_mut(|m| m.toggle_popup(popup_id));
+        }
+        egui::popup_below_widget(
+            ui,
+            popup_id,
+            &blocks_btn,
+            egui::PopupCloseBehavior::CloseOnClickOutside,
+            |ui| {
+                ui.set_min_width(210.0);
+                self.layout_blocks_menu(ui);
+            },
+        );
+        if tool_button(
+            ui,
+            UiIcon::Fullscreen,
+            "",
+            self.terminal_fullscreen,
+            show_icons,
+            palette,
+        )
+        .on_hover_text(format!(
+            "Fullscreen terminal  {}",
+            self.key_hint(Cmd::FullscreenTerminal)
+        ))
+        .clicked()
+        {
+            self.actions.push(Action::ToggleFullscreenTerminal);
         }
         let unread_str = if self.unread > 0 {
             self.unread.min(99).to_string()
@@ -194,6 +245,193 @@ impl AisApp {
         {
             self.actions.push(Action::OpenNotices);
         }
+    }
+
+    pub fn layout_blocks_menu(&mut self, ui: &mut egui::Ui) {
+        let items = [
+            (
+                self.settings.show_title_bar,
+                "Title bar",
+                Cmd::ToggleTitleBar,
+                Action::ToggleTitleBar,
+            ),
+            (
+                self.settings.show_sidebar,
+                "Sidebar",
+                Cmd::ToggleSidebar,
+                Action::ToggleSidebar,
+            ),
+            (
+                self.settings.show_toolbar,
+                "Project toolbar",
+                Cmd::ToggleToolbar,
+                Action::ToggleToolbar,
+            ),
+            (
+                self.settings.show_agents,
+                "Agent pills",
+                Cmd::ToggleAgents,
+                Action::ToggleAgents,
+            ),
+            (
+                self.settings.show_pane_headers,
+                "Pane headers",
+                Cmd::TogglePaneHeaders,
+                Action::TogglePaneHeaders,
+            ),
+            (
+                self.settings.show_status_bar,
+                "Status bar",
+                Cmd::ToggleStatusBar,
+                Action::ToggleStatusBar,
+            ),
+        ];
+        for (checked, label, cmd, action) in items {
+            let hint = self.key_hint(cmd);
+            let text = if hint.is_empty() {
+                label.to_string()
+            } else {
+                format!("{label}  ({hint})")
+            };
+            let mut val = checked;
+            if ui.checkbox(&mut val, text).clicked() {
+                self.actions.push(action);
+            }
+        }
+        ui.separator();
+        let dock_items = [
+            (
+                self.right_tab() == Some(RightTab::Files),
+                "Files dock",
+                Cmd::ToggleFiles,
+                Action::ToggleFiles,
+            ),
+            (
+                self.right_tab() == Some(RightTab::Usage),
+                "Usage dock",
+                Cmd::ToggleUsage,
+                Action::ToggleUsage,
+            ),
+        ];
+        for (checked, label, cmd, action) in dock_items {
+            let hint = self.key_hint(cmd);
+            let text = if hint.is_empty() {
+                label.to_string()
+            } else {
+                format!("{label}  ({hint})")
+            };
+            let mut val = checked;
+            if ui.checkbox(&mut val, text).clicked() {
+                self.actions.push(action);
+            }
+        }
+        ui.separator();
+        let fs_hint = self.key_hint(Cmd::FullscreenTerminal);
+        let fs_label = if self.terminal_fullscreen {
+            format!("Exit fullscreen terminal  {fs_hint}")
+        } else {
+            format!("Fullscreen terminal  {fs_hint}")
+        };
+        if ui.button(fs_label).clicked() {
+            self.actions.push(Action::ToggleFullscreenTerminal);
+            ui.close_menu();
+        }
+        let win_fs = ui.ctx().input(|i| i.viewport().fullscreen.unwrap_or(false));
+        let win_label = if win_fs {
+            "Exit window fullscreen"
+        } else {
+            "Window fullscreen"
+        };
+        if ui.button(win_label).clicked() {
+            self.actions.push(Action::ToggleWindowFullscreen);
+            ui.close_menu();
+        }
+        if ui.button("Show all blocks").clicked() {
+            self.actions.push(Action::ShowAllBlocks);
+            ui.close_menu();
+        }
+    }
+
+    /// Floating hover bar shown near the top-right edge when the title bar is
+    /// hidden or fullscreen terminal mode is active, so mouse users always have
+    /// an effortless way back.
+    pub fn floating_chrome_bar(&mut self, ctx: &egui::Context) {
+        let screen = ctx.screen_rect();
+        let popup_id = Id::new("floating-blocks-popup");
+        let popup_open = ctx.memory(|m| m.is_popup_open(popup_id));
+        let near_top = ctx.input(|i| {
+            i.pointer
+                .hover_pos()
+                .is_some_and(|pos| pos.y <= screen.top() + 44.0 && pos.x >= screen.right() - 420.0)
+        });
+        if !near_top && !popup_open {
+            return;
+        }
+        let palette = self.palette();
+        let show_icons = self.settings.show_icons;
+        egui::Area::new(Id::new("floating-chrome-bar"))
+            .order(egui::Order::Foreground)
+            .anchor(egui::Align2::RIGHT_TOP, Vec2::new(-10.0, 8.0))
+            .show(ctx, |ui| {
+                egui::Frame::NONE
+                    .fill(palette.panel.gamma_multiply(0.94))
+                    .stroke(Stroke::new(1.0, palette.border_strong))
+                    .corner_radius(CornerRadius::same(8))
+                    .inner_margin(Margin::symmetric(8, 4))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = 6.0;
+                            if self.terminal_fullscreen {
+                                if ui
+                                    .add(small_button(
+                                        &format!("Exit fullscreen  {}", self.key_hint(Cmd::FullscreenTerminal)),
+                                        &palette,
+                                    ))
+                                    .clicked()
+                                {
+                                    self.actions.push(Action::ToggleFullscreenTerminal);
+                                }
+                            } else if !self.settings.show_title_bar {
+                                if ui.add(small_button("Show title bar", &palette)).clicked() {
+                                    self.actions.push(Action::ToggleTitleBar);
+                                }
+                                if tool_button(ui, UiIcon::Fullscreen, "", false, show_icons, &palette)
+                                    .on_hover_text(format!(
+                                        "Fullscreen terminal  {}",
+                                        self.key_hint(Cmd::FullscreenTerminal)
+                                    ))
+                                    .clicked()
+                                {
+                                    self.actions.push(Action::ToggleFullscreenTerminal);
+                                }
+                            }
+                            let win_fs = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
+                            if ui
+                                .add(small_button(
+                                    if win_fs { "Windowed" } else { "OS Fullscreen" },
+                                    &palette,
+                                ))
+                                .clicked()
+                            {
+                                self.actions.push(Action::ToggleWindowFullscreen);
+                            }
+                            let blocks_btn = tool_button(ui, UiIcon::Layout, "Blocks", false, show_icons, &palette);
+                            if blocks_btn.clicked() {
+                                ui.memory_mut(|m| m.toggle_popup(popup_id));
+                            }
+                            egui::popup_below_widget(
+                                ui,
+                                popup_id,
+                                &blocks_btn,
+                                egui::PopupCloseBehavior::CloseOnClickOutside,
+                                |ui| {
+                                    ui.set_min_width(210.0);
+                                    self.layout_blocks_menu(ui);
+                                },
+                            );
+                        });
+                    });
+            });
     }
 
     fn search_field(&mut self, ui: &mut egui::Ui, palette: &Palette, compact: bool) {

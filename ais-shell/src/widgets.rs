@@ -1,6 +1,8 @@
 //! Shared UI widgets, painted vector icons, theme helpers and platform actions.
 
 use crate::cli::CliKind;
+#[cfg(target_os = "windows")]
+use crate::cli::no_window;
 use crate::log;
 use crate::sessions::Session;
 use crate::theme::{Palette, Theme, desaturate, scale};
@@ -33,6 +35,9 @@ pub enum UiIcon {
     Gauge,
     Folder,
     FolderOpen,
+    Layout,
+    Fullscreen,
+    Agents,
 }
 
 impl UiIcon {
@@ -55,6 +60,9 @@ impl UiIcon {
             UiIcon::Gauge => "Usage",
             UiIcon::Folder => "[dir]",
             UiIcon::FolderOpen => "[open]",
+            UiIcon::Layout => "Blocks",
+            UiIcon::Fullscreen => "Full",
+            UiIcon::Agents => "Pills",
         }
     }
 
@@ -219,6 +227,40 @@ impl UiIcon {
                 painter.rect_stroke(box_rect, CornerRadius::same(2), stroke, egui::StrokeKind::Inside);
                 let tab = Rect::from_min_size(box_rect.min - Vec2::new(0.0, r * 0.32), Vec2::new(r * 0.85, r * 0.35));
                 painter.rect_stroke(tab, CornerRadius::same(1), stroke, egui::StrokeKind::Inside);
+            }
+            UiIcon::Layout => {
+                let box_rect = Rect::from_center_size(c, Vec2::new(r * 2.1, r * 1.7));
+                painter.rect_stroke(box_rect, CornerRadius::same(2), stroke, egui::StrokeKind::Inside);
+                let split_x = box_rect.left() + box_rect.width() * 0.38;
+                let split_y = box_rect.top() + box_rect.height() * 0.36;
+                painter.line_segment(
+                    [
+                        Pos2::new(box_rect.left(), split_y),
+                        Pos2::new(box_rect.right(), split_y),
+                    ],
+                    stroke,
+                );
+                painter.line_segment(
+                    [Pos2::new(split_x, split_y), Pos2::new(split_x, box_rect.bottom())],
+                    stroke,
+                );
+            }
+            UiIcon::Fullscreen => {
+                let d = r * 0.88;
+                let arm = r * 0.45;
+                for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                    let corner = c + Vec2::new(d * sx, d * sy);
+                    painter.line_segment([corner, corner + Vec2::new(-arm * sx, 0.0)], stroke);
+                    painter.line_segment([corner, corner + Vec2::new(0.0, -arm * sy)], stroke);
+                }
+            }
+            UiIcon::Agents => {
+                let pill_w = r * 1.9;
+                let pill_h = r * 0.68;
+                let top = Rect::from_center_size(c + Vec2::new(0.0, -r * 0.48), Vec2::new(pill_w, pill_h));
+                let bot = Rect::from_center_size(c + Vec2::new(0.0, r * 0.48), Vec2::new(pill_w, pill_h));
+                painter.rect_stroke(top, CornerRadius::same(3), stroke, egui::StrokeKind::Inside);
+                painter.rect_stroke(bot, CornerRadius::same(3), stroke, egui::StrokeKind::Inside);
             }
         }
     }
@@ -921,7 +963,7 @@ pub fn file_tint(name: &str, palette: &Palette) -> Color32 {
         "py" | "js" | "ts" | "tsx" | "jsx" => palette.term.ansi[4],
         "md" | "txt" | "rst" => palette.accent,
         "json" | "toml" | "yaml" | "yml" | "lock" => palette.term.ansi[3],
-        "sh" | "zsh" | "bash" | "fish" => palette.green,
+        "sh" | "zsh" | "bash" | "fish" | "ps1" | "bat" | "cmd" => palette.green,
         "png" | "jpg" | "jpeg" | "svg" | "webp" | "gif" => palette.term.ansi[5],
         _ => palette.muted,
     }
@@ -1034,7 +1076,35 @@ pub fn choose_folder(start: &Path) -> Option<PathBuf> {
         );
         Command::new("osascript").arg("-e").arg(script).output().ok()?
     };
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    let output = {
+        let escaped = start.to_string_lossy().replace('\'', "''");
+        let script = format!(
+            "Add-Type -AssemblyName System.Windows.Forms; \
+             [System.Windows.Forms.Application]::EnableVisualStyles(); \
+             $d = New-Object System.Windows.Forms.FolderBrowserDialog; \
+             $d.Description = 'Open a project folder in ais'; \
+             $d.UseDescriptionForTitle = $true; \
+             $d.SelectedPath = '{escaped}'; \
+             if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{ \
+                 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; \
+                 Write-Output $d.SelectedPath \
+             }}"
+        );
+        let mut cmd = Command::new("powershell.exe");
+        cmd.args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-STA",
+            "-WindowStyle",
+            "Hidden",
+            "-Command",
+            &script,
+        ]);
+        no_window(&mut cmd);
+        cmd.output().ok()?
+    };
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
     let output = Command::new("zenity")
         .args(["--file-selection", "--directory", "--filename"])
         .arg(format!("{}/", start.display()))
@@ -1043,11 +1113,18 @@ pub fn choose_folder(start: &Path) -> Option<PathBuf> {
     if !output.status.success() {
         return None;
     }
-    let text = String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .trim_end_matches('/')
-        .to_string();
-    let path = PathBuf::from(if text.is_empty() { "/".to_string() } else { text });
+    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let trimmed = text.trim_end_matches(['/', '\\']);
+    let path = if trimmed.is_empty() {
+        if cfg!(windows) {
+            return None;
+        }
+        PathBuf::from("/")
+    } else if cfg!(windows) && trimmed.len() == 2 && trimmed.as_bytes()[1] == b':' {
+        PathBuf::from(format!("{trimmed}\\"))
+    } else {
+        PathBuf::from(trimmed)
+    };
     path.is_dir().then_some(path)
 }
 
@@ -1060,7 +1137,39 @@ pub fn open_external(target: &str, reveal: bool) {
         } else {
             Command::new("open").arg(&target).status()
         };
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
+        let status: std::io::Result<std::process::ExitStatus> = {
+            if reveal && !Path::new(&target).is_dir() {
+                use std::os::windows::process::CommandExt;
+                let safe = target.replace('"', "");
+                Command::new("explorer.exe")
+                    .raw_arg(format!("/select,\"{safe}\""))
+                    .status()
+            } else {
+                use std::os::windows::ffi::OsStrExt;
+                let wide_op: Vec<u16> = "open\0".encode_utf16().collect();
+                let wide_target: Vec<u16> = std::ffi::OsStr::new(&target)
+                    .encode_wide()
+                    .chain(std::iter::once(0))
+                    .collect();
+                let rc = unsafe {
+                    windows_sys::Win32::UI::Shell::ShellExecuteW(
+                        std::ptr::null_mut(),
+                        wide_op.as_ptr(),
+                        wide_target.as_ptr(),
+                        std::ptr::null(),
+                        std::ptr::null(),
+                        windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL,
+                    )
+                } as isize;
+                if rc <= 32 {
+                    Err(std::io::Error::other(format!("ShellExecuteW returned {rc}")))
+                } else {
+                    return;
+                }
+            }
+        };
+        #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
         let status = {
             let path = Path::new(&target);
             let shown = match path.parent() {
@@ -1092,7 +1201,33 @@ pub fn system_notification(text: &str) {
                 log::warn(&format!("system_notification failed: {error}"));
             }
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
+        {
+            let xml_escape = |s: &str| {
+                s.replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;")
+                    .replace('"', "&quot;")
+                    .replace('\'', "&apos;")
+            };
+            let title = xml_escape(crate::app::APP_NAME);
+            let body = xml_escape(&text).replace('\'', "''");
+            let script = format!(
+                "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null; \
+                 [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null; \
+                 $xml = New-Object Windows.Data.Xml.Dom.XmlDocument; \
+                 $xml.LoadXml('<toast><visual><binding template=\"ToastText02\"><text id=\"1\">{title}</text><text id=\"2\">{body}</text></binding></visual></toast>'); \
+                 $toast = [Windows.UI.Notifications.ToastNotification]::new($xml); \
+                 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('ais').Show($toast)"
+            );
+            let mut cmd = Command::new("powershell.exe");
+            cmd.args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &script]);
+            no_window(&mut cmd);
+            if let Err(error) = cmd.status() {
+                log::warn(&format!("system_notification failed: {error}"));
+            }
+        }
+        #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
         {
             if let Err(error) = Command::new("notify-send")
                 .arg(crate::app::APP_NAME)

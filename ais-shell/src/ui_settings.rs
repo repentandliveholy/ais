@@ -8,6 +8,7 @@ use crate::cli::{CliKind, canonical_path};
 use crate::keys::{Command as Cmd, MOD, format_chord};
 use crate::sessions::truncate;
 use crate::theme::{FontChoice, Palette, Settings, StartSessions, TerminalPalette, Theme, UiTheme, scale};
+use crate::update::{self, UpdateStatus};
 use crate::widgets::{
     SETTINGS_CONTROL, SETTINGS_WIDTH, age_system, close_button, kind_color, open_external, pretty_path, section,
     setting_note, setting_row, small_button, tabs,
@@ -29,11 +30,12 @@ impl AisApp {
 
     pub fn typed_folder_item(&self) -> Option<PaletteItem> {
         let typed = self.palette_state.query.trim();
-        if !typed.starts_with('/') && !typed.starts_with('~') {
+        let windows_abs = cfg!(windows) && std::path::Path::new(typed).is_absolute();
+        if !typed.starts_with('/') && !typed.starts_with('~') && !windows_abs {
             return None;
         }
         let expanded = match typed.strip_prefix('~') {
-            Some(rest) => self.home.join(rest.trim_start_matches('/')),
+            Some(rest) => self.home.join(rest.trim_start_matches(['/', '\\'])),
             None => PathBuf::from(typed),
         };
         expanded.is_dir().then(|| PaletteItem {
@@ -123,11 +125,34 @@ impl AisApp {
         }
         items.push(PaletteItem {
             group: "Commands",
+            title: "Show all layout blocks".into(),
+            detail: String::new(),
+            color: None,
+            action: Action::ShowAllBlocks,
+        });
+        items.push(PaletteItem {
+            group: "Commands",
             title: "Refresh usage limits".into(),
             detail: String::new(),
             color: None,
             action: Action::RefreshUsage,
         });
+        items.push(PaletteItem {
+            group: "Commands",
+            title: "Check for updates".into(),
+            detail: format!("v{}", update::VERSION),
+            color: None,
+            action: Action::CheckUpdates,
+        });
+        if let UpdateStatus::Updated(version) = &self.update_status {
+            items.push(PaletteItem {
+                group: "Commands",
+                title: format!("Restart to apply update (v{version})"),
+                detail: "restart".into(),
+                color: Some(palette.green),
+                action: Action::RestartToUpdate,
+            });
+        }
         for theme in UiTheme::ALL {
             items.push(PaletteItem {
                 group: "Theme",
@@ -463,7 +488,9 @@ impl AisApp {
                                     });
                                 });
                             }
-                            if matches_query("layout side panels conversations agents status bar title bar") {
+                            if matches_query(
+                                "layout side panels conversations title bar sidebar toolbar agents pills pane headers status bar"
+                            ) {
                                 section(ui, "Layout", &palette);
                                 setting_row(ui, "Side panels", |ui| {
                                     let labels = ["Sidebar left", "Sidebar right"];
@@ -485,9 +512,13 @@ impl AisApp {
                                     }
                                 });
                                 setting_note(ui, "List on an empty pane. Auto hides it while the sidebar shows Sessions.", &palette);
-                                setting_row(ui, "Show", |ui| {
+                                setting_row(ui, "Show blocks", |ui| {
                                     ui.vertical(|ui| {
-                                        changed |= ui.checkbox(&mut self.settings.show_agents, "Agent cards").changed();
+                                        changed |= ui.checkbox(&mut self.settings.show_title_bar, "Title bar").changed();
+                                        changed |= ui.checkbox(&mut self.settings.show_sidebar, "Sidebar").changed();
+                                        changed |= ui.checkbox(&mut self.settings.show_toolbar, "Project toolbar").changed();
+                                        changed |= ui.checkbox(&mut self.settings.show_agents, "Agent pills").changed();
+                                        changed |= ui.checkbox(&mut self.settings.show_pane_headers, "Pane headers").changed();
                                         changed |= ui.checkbox(&mut self.settings.show_status_bar, "Status bar").changed();
                                     });
                                 });
@@ -687,7 +718,59 @@ impl AisApp {
                             }
                         }
 
-                        if show_tab(SettingsTab::About) && matches_query("about version license repository settings log reset") {
+                        if show_tab(SettingsTab::About)
+                            && matches_query("about version update autoupdate target license repository settings log reset")
+                        {
+                            section(ui, "Updates", &palette);
+                            setting_row(ui, "Auto-update", |ui| {
+                                changed |= ui
+                                    .checkbox(
+                                        &mut self.settings.auto_update,
+                                        "Check & install updates automatically (daily)",
+                                    )
+                                    .changed();
+                            });
+                            let (status_text, status_color) = match &self.update_status {
+                                UpdateStatus::Idle => (
+                                    format!("v{} ({})", update::VERSION, update::TARGET),
+                                    palette.muted,
+                                ),
+                                UpdateStatus::Checking => ("Checking for updates…".into(), palette.accent),
+                                UpdateStatus::UpToDate(v) => (format!("Up to date (v{v})"), palette.green),
+                                UpdateStatus::Updated(v) => (
+                                    format!("Updated to v{v} — restart to apply"),
+                                    palette.green,
+                                ),
+                                UpdateStatus::Available { version, reason } => (
+                                    format!("v{version} available ({reason})"),
+                                    palette.amber,
+                                ),
+                                UpdateStatus::Error(err) => (format!("Error: {err}"), palette.red),
+                            };
+                            setting_row(ui, "Status", |ui| {
+                                ui.vertical(|ui| {
+                                    ui.label(RichText::new(status_text).size(12.0).color(status_color));
+                                    ui.horizontal(|ui| {
+                                        let checking = matches!(self.update_status, UpdateStatus::Checking);
+                                        ui.add_enabled_ui(!checking, |ui| {
+                                            if ui.add(small_button("Check for updates", &palette)).clicked() {
+                                                self.actions.push(Action::CheckUpdates);
+                                            }
+                                        });
+                                        if matches!(self.update_status, UpdateStatus::Updated(_))
+                                            && ui.add(small_button("Restart now", &palette)).clicked()
+                                        {
+                                            self.actions.push(Action::RestartToUpdate);
+                                        }
+                                        if matches!(self.update_status, UpdateStatus::Available { .. })
+                                            && ui.add(small_button("Releases page", &palette)).clicked()
+                                        {
+                                            open_external(update::RELEASES_URL, false);
+                                        }
+                                    });
+                                });
+                            });
+
                             section(ui, "About", &palette);
                             let ais = self
                                 .sessions
@@ -697,7 +780,7 @@ impl AisApp {
                             for (label, value) in [
                                 ("Version", format!("{APP_TITLE} {}", env!("CARGO_PKG_VERSION"))),
                                 ("License", "MIT (not affiliated with Anthropic, OpenAI, or Google)".into()),
-                                ("ais indexer", ais),
+                                ("ais-cli indexer", ais),
                                 ("Settings", pretty_path(&self.settings_file, &self.home)),
                                 ("Log file", pretty_path(crate::log::log_path(), &self.home)),
                             ] {

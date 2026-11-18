@@ -1015,6 +1015,7 @@ impl FontChoice {
             FontChoice::FiraCode => "Fira Code Nerd Font",
             FontChoice::Hack => "Hack Nerd Font",
             FontChoice::System if cfg!(target_os = "macos") => "System (SF / Menlo)",
+            FontChoice::System if cfg!(target_os = "windows") => "System (Segoe UI / Consolas)",
             FontChoice::System => "System (DejaVu)",
         }
     }
@@ -1048,12 +1049,23 @@ impl FontChoice {
     pub fn files(self, home: &Path, variant: &str, weights: &[&str]) -> Vec<PathBuf> {
         let mut out = Vec::new();
         if let Some(stem) = self.stem() {
-            for dir in [
+            #[cfg_attr(not(windows), allow(unused_mut))]
+            let mut dirs = vec![
                 home.join("Library/Fonts"),
                 PathBuf::from("/Library/Fonts"),
                 home.join(".local/share/fonts"),
                 PathBuf::from("/usr/share/fonts/truetype/nerd-fonts"),
-            ] {
+            ];
+            #[cfg(windows)]
+            {
+                if let Some(local) = env::var_os("LOCALAPPDATA").map(PathBuf::from) {
+                    dirs.push(local.join("Microsoft/Windows/Fonts"));
+                }
+                if let Some(windir) = env::var_os("WINDIR").map(PathBuf::from) {
+                    dirs.push(windir.join("Fonts"));
+                }
+            }
+            for dir in dirs {
                 for weight in weights {
                     out.push(dir.join(format!("{stem}{variant}-{weight}.ttf")));
                 }
@@ -1114,13 +1126,17 @@ pub struct Settings {
     pub start_sessions: StartSessions,
     /// Sidebar on the right, Files/Usage/Alerts dock on the left.
     pub swap_sides: bool,
+    pub show_title_bar: bool,
+    pub show_toolbar: bool,
     pub show_agents: bool,
+    pub show_pane_headers: bool,
     pub show_status_bar: bool,
     pub option_as_meta: bool,
     pub copy_on_select: bool,
     pub cursor_blink: bool,
     pub system_notifications: bool,
     pub auto_live_usage: bool,
+    pub auto_update: bool,
     pub allow_osc52: bool,
     pub reduce_motion: bool,
     pub cli_args: BTreeMap<String, String>,
@@ -1159,13 +1175,17 @@ impl Default for Settings {
             show_icons: true,
             start_sessions: StartSessions::Auto,
             swap_sides: false,
+            show_title_bar: true,
+            show_toolbar: true,
             show_agents: true,
+            show_pane_headers: true,
             show_status_bar: true,
             option_as_meta: false,
             copy_on_select: false,
             cursor_blink: false,
             system_notifications: true,
             auto_live_usage: false,
+            auto_update: true,
             allow_osc52: true,
             reduce_motion: false,
             cli_args: BTreeMap::new(),
@@ -1189,11 +1209,24 @@ impl Default for Settings {
 }
 
 pub fn settings_path(home: &Path) -> PathBuf {
-    env::var_os("XDG_CONFIG_HOME")
+    let base = env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
-        .unwrap_or_else(|| home.join(".config"))
-        .join("ais-shell/settings.json")
+        .unwrap_or_else(|| home.join(".config"));
+    let primary = base.join("ais/settings.json");
+    if primary.exists() {
+        return primary;
+    }
+    let legacy = base.join("ais-shell/settings.json");
+    if legacy.exists() {
+        // Migrate legacy config path seamlessly on next save while returning primary path.
+        if let Some(parent) = primary.parent()
+            && fs::create_dir_all(parent).is_ok()
+        {
+            let _ = fs::copy(&legacy, &primary);
+        }
+    }
+    primary
 }
 
 impl Settings {
@@ -1318,13 +1351,17 @@ impl Settings {
             show_icons: boolean("show_icons", "", d.show_icons),
             start_sessions: StartSessions::from_id(value.get("start_sessions").and_then(Value::as_str)),
             swap_sides: boolean("swap_sides", "", d.swap_sides),
+            show_title_bar: boolean("show_title_bar", "", d.show_title_bar),
+            show_toolbar: boolean("show_toolbar", "", d.show_toolbar),
             show_agents: boolean("show_agents", "", d.show_agents),
+            show_pane_headers: boolean("show_pane_headers", "", d.show_pane_headers),
             show_status_bar: boolean("show_status_bar", "", d.show_status_bar),
             option_as_meta: boolean("option_as_meta", "", d.option_as_meta),
             copy_on_select: boolean("copy_on_select", "", d.copy_on_select),
             cursor_blink: boolean("cursor_blink", "", d.cursor_blink),
             system_notifications: boolean("system_notifications", "", d.system_notifications),
             auto_live_usage: boolean("auto_live_usage", "", d.auto_live_usage),
+            auto_update: boolean("auto_update", "", d.auto_update),
             allow_osc52: boolean("allow_osc52", "", d.allow_osc52),
             reduce_motion: boolean("reduce_motion", "", d.reduce_motion),
             cli_args: value
@@ -1390,13 +1427,17 @@ impl Settings {
             "show_icons": self.show_icons,
             "start_sessions": self.start_sessions.label().to_ascii_lowercase(),
             "swap_sides": self.swap_sides,
+            "show_title_bar": self.show_title_bar,
+            "show_toolbar": self.show_toolbar,
             "show_agents": self.show_agents,
+            "show_pane_headers": self.show_pane_headers,
             "show_status_bar": self.show_status_bar,
             "option_as_meta": self.option_as_meta,
             "copy_on_select": self.copy_on_select,
             "cursor_blink": self.cursor_blink,
             "system_notifications": self.system_notifications,
             "auto_live_usage": self.auto_live_usage,
+            "auto_update": self.auto_update,
             "allow_osc52": self.allow_osc52,
             "reduce_motion": self.reduce_motion,
             "cli_args": self.cli_args,
@@ -1481,17 +1522,39 @@ mod tests {
 
     #[test]
     fn settings_round_trip_and_legacy_keys() {
-        let legacy =
-            json!({"theme": "light", "show_projects": false, "terminal_font_size": 17.0, "terminal_palette": "nord"});
+        let legacy = json!({
+            "theme": "light",
+            "show_projects": false,
+            "terminal_font_size": 17.0,
+            "terminal_palette": "nord",
+            "show_title_bar": false,
+            "show_toolbar": false,
+            "show_agents": false,
+            "show_pane_headers": false,
+            "show_status_bar": false,
+            "auto_update": false
+        });
         let settings = Settings::from_value(&legacy);
         assert_eq!(settings.theme, Theme::Light);
         assert!(!settings.show_sidebar);
         assert_eq!(settings.font_size, 17.0);
         assert_eq!(settings.terminal_palette, TerminalPalette::Nord);
         assert!(!settings.auto_live_usage);
+        assert!(!settings.show_title_bar);
+        assert!(!settings.show_toolbar);
+        assert!(!settings.show_agents);
+        assert!(!settings.show_pane_headers);
+        assert!(!settings.show_status_bar);
+        assert!(!settings.auto_update);
         let again = Settings::from_value(&settings.to_value());
         assert_eq!(again.font_size, 17.0);
         assert!(!again.show_sidebar);
+        assert!(!again.show_title_bar);
+        assert!(!again.show_toolbar);
+        assert!(!again.show_agents);
+        assert!(!again.show_pane_headers);
+        assert!(!again.show_status_bar);
+        assert!(!again.auto_update);
     }
 
     #[test]

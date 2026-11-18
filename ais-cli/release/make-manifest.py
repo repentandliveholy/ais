@@ -17,6 +17,8 @@ def main() -> None:
     version, folder = sys.argv[1], Path(sys.argv[2])
     assets = {}
     for path in sorted(folder.glob("ais-*")):
+        if path.name.startswith(("ais-gui-", "ais-cli-")):
+            continue
         target = path.name[len("ais-"):].removesuffix(".exe")
         assets[target] = {
             "url": f"{REPO}/releases/download/v{version}/{path.name}",

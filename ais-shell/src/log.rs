@@ -12,11 +12,18 @@ static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 pub fn log_path() -> &'static PathBuf {
     LOG_PATH.get_or_init(|| {
+        #[cfg(windows)]
+        let base = env::var_os("XDG_STATE_HOME")
+            .or_else(|| env::var_os("LOCALAPPDATA"))
+            .map(PathBuf::from)
+            .filter(|path| path.is_absolute())
+            .unwrap_or_else(|| home_dir().join(".local/state"));
+        #[cfg(not(windows))]
         let base = env::var_os("XDG_STATE_HOME")
             .map(PathBuf::from)
             .filter(|path| path.is_absolute())
             .unwrap_or_else(|| home_dir().join(".local/state"));
-        base.join("ais-shell/ais-shell.log")
+        base.join("ais/ais.log")
     })
 }
 

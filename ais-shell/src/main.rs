@@ -1,5 +1,4 @@
-#[cfg(target_os = "windows")]
-compile_error!("ais-shell supports macOS and Linux (POSIX PTYs) only; Windows is not supported yet.");
+#![cfg_attr(all(target_os = "windows", not(debug_assertions)), windows_subsystem = "windows")]
 
 mod app;
 mod cli;
@@ -15,27 +14,54 @@ mod ui_dock;
 mod ui_settings;
 mod ui_sidebar;
 mod ui_workspace;
+mod update;
 mod usage;
 mod view;
 mod widgets;
 
 use eframe::egui;
 
+#[cfg(windows)]
+fn attach_parent_console() {
+    // Release GUI binaries use windows_subsystem = "windows"; attach to the
+    // caller's terminal when invoked with --help, --version or --update.
+    unsafe {
+        windows_sys::Win32::System::Console::AttachConsole(windows_sys::Win32::System::Console::ATTACH_PARENT_PROCESS);
+    }
+}
+
+#[cfg(not(windows))]
+fn attach_parent_console() {}
+
 fn main() -> eframe::Result<()> {
     log::install_panic_hook();
 
     if std::env::args().any(|arg| arg == "--version" || arg == "-V") {
+        attach_parent_console();
         println!("{} {}", app::APP_TITLE, env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
     if std::env::args().any(|arg| arg == "--help" || arg == "-h") {
+        attach_parent_console();
         println!("{} {}\n\n{USAGE}", app::APP_TITLE, env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
     if let Err(message) = check_args(std::env::args().skip(1)) {
-        eprintln!("ais-shell: {message}\n\n{USAGE}");
+        attach_parent_console();
+        eprintln!("ais: {message}\n\n{USAGE}");
         std::process::exit(2);
     }
+    if std::env::args().any(|arg| arg == "--update") {
+        attach_parent_console();
+        match update::run_manual() {
+            Ok(code) => std::process::exit(code),
+            Err(error) => {
+                eprintln!("ais update failed: {error}");
+                std::process::exit(1);
+            }
+        }
+    }
+    let no_update_check = std::env::args().any(|arg| arg == "--no-update-check");
 
     import_login_env();
 
@@ -77,21 +103,24 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         app::APP_NAME,
         options,
-        Box::new(|cc| Ok(Box::new(app::AisApp::new(cc)))),
+        Box::new(move |cc| Ok(Box::new(app::AisApp::new(cc, no_update_check)))),
     )
 }
 
 const USAGE: &str = "\
-Usage: ais-shell [PATH] [--run CLI]
+Usage: ais [PATH] [--run CLI]
 
-  PATH           open this folder as a project space
-  --run CLI      start a CLI in it right away:
-                 omp, claude, codex, agy, gemini, pi or shell
-  -h, --help     print this help
-  -V, --version  print the version
+  PATH               open this folder as a project space
+  --run CLI          start a CLI in it right away:
+                     omp, claude, codex, agy, gemini, pi or shell
+  --update           check and install the latest ais release now
+  --no-update-check  skip the background update check for this run
+  -h, --help         print this help
+  -V, --version      print the version
 
 Environment:
-  AIS_BIN        path to the `ais` indexer (conversation lists, usage limits)
+  AIS_BIN               path to `ais-cli` (conversation lists, usage limits)
+  AIS_NO_UPDATE=1       disable background auto-update checks
   AIS_FORCE_LOGIN_PATH  import login shell environment even when started from a terminal";
 
 /// Rejects typos on the command line before a window opens.
@@ -104,6 +133,7 @@ fn check_args(args: impl Iterator<Item = String>) -> Result<(), String> {
                 Some(id) => return Err(format!("unknown CLI for --run: {id}")),
                 None => return Err("--run needs a CLI name".into()),
             },
+            "--update" | "--no-update-check" => {}
             // macOS passes a process serial number to apps opened from Finder.
             flag if flag.starts_with("-psn_") => {}
             flag if flag.starts_with('-') => return Err(format!("unknown option: {flag}")),
@@ -116,6 +146,7 @@ fn check_args(args: impl Iterator<Item = String>) -> Result<(), String> {
 /// Apps started from Finder/Dock get a minimal PATH (/usr/bin:/bin…) and miss
 /// shell exports (API keys, nvm, pyenv). Ask the user's login shell for its
 /// environment once, reading stdout concurrently so a chatty rc never deadlocks.
+#[cfg(unix)]
 fn import_login_env() {
     use std::io::Read;
     use std::process::{Command, Stdio};
@@ -185,26 +216,26 @@ fn import_login_env() {
     }
 }
 
+#[cfg(not(unix))]
+fn import_login_env() {}
+
+#[cfg(unix)]
 fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|window| window == needle)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::check_args;
-
-    fn check(args: &[&str]) -> Result<(), String> {
-        check_args(args.iter().map(|arg| arg.to_string()))
-    }
+    use super::*;
 
     #[test]
-    fn command_line_is_validated() {
-        assert!(check(&[]).is_ok());
-        assert!(check(&["~/code/app", "--run", "claude"]).is_ok());
-        assert!(check(&["--run", "shell"]).is_ok());
-        assert!(check(&["-psn_0_12345"]).is_ok());
-        assert!(check(&["--run"]).is_err());
-        assert!(check(&["--run", "vim"]).is_err());
-        assert!(check(&["--frobnicate"]).is_err());
+    fn cli_args_accept_known_flags() {
+        assert!(check_args(["/tmp".into(), "--run".into(), "claude".into()].into_iter()).is_ok());
+        assert!(check_args(["--update".into()].into_iter()).is_ok());
+        assert!(check_args(["--no-update-check".into()].into_iter()).is_ok());
+        assert!(check_args(["-psn_0_12345".into()].into_iter()).is_ok());
+        assert!(check_args(["--run".into()].into_iter()).is_err());
+        assert!(check_args(["--run".into(), "bogus".into()].into_iter()).is_err());
+        assert!(check_args(["--bogus".into()].into_iter()).is_err());
     }
 }

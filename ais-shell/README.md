@@ -13,38 +13,45 @@ reads the same local histories. No Electron, no account: one ~6 MB binary.
 
 ## Install
 
-Requires a Rust toolchain (**1.89+** on macOS 11.0+ or Linux; Linux support is
+Requires a Rust toolchain (**1.89+** on macOS 11.0+, Windows 10/11, or Linux; Linux support is
 currently experimental).
 
 ```sh
 cd ais-shell
 ./bundle.sh --install        # macOS: builds dist/ais.app and copies it to /Applications
-# or run directly
+# or run directly (macOS / Linux / Windows)
 cargo run --release -- ~/code/my-project --run claude
 ```
 
 ```
-ais-shell [PATH] [--run omp|claude|codex|agy|gemini|pi|shell]
+ais [PATH] [--run omp|claude|codex|agy|gemini|pi|shell] [--update] [--no-update-check]
 ```
 
-Conversation lists and usage limits come from the native `ais` CLI
+### Updates
+
+`ais` checks for signed updates (`ais-gui-latest.json` + Ed25519 signature + SHA-256) automatically once a day when **Auto-update** is enabled in **Settings → About** (disable with `AIS_NO_UPDATE=1` or `--no-update-check`), and atomically replaces the executable on macOS, Linux, and Windows. Run `ais --update` or click **Check for updates** in **Settings → About** to update manually.
+
+Conversation lists and usage limits come from the companion `ais-cli`
 ([`../ais-cli`](../ais-cli)); `bundle.sh` copies it into `ais.app/Contents/Resources`.
-It is found via `$AIS_BIN`, then `PATH`, then beside the executable / in the bundle
-Resources (`../ais` in debug builds). Without it the app still works as a
-multi-CLI terminal workspace.
+It is found via `$AIS_BIN`, then `PATH` (`ais-cli` or `ais`), then beside the
+executable / in bundle Resources. Without it the app still works as a multi-CLI
+terminal workspace.
 
 ## Requirements
 
 - **macOS:** macOS 11.0+. Built-in vector UI icons work out of the box; a Nerd
   Font (JetBrains Mono, Fira Code, or Hack) is optional for terminal Powerline /
   Nerd glyphs.
+- **Windows:** Windows 10/11 (ConPTY). Uses `pwsh` / `powershell` / `cmd.exe`
+  automatically for terminal panes and resolves `.cmd` / `.exe` AI CLIs from
+  `PATH`.
 - **Linux (experimental):** runtime utilities `zenity` (folder picker),
   `notify-send` (desktop alerts), and `xdg-open` (links and folders). Building
   from source requires `libxkbcommon-dev`, `libwayland-dev` / X11 dev headers,
   `libgl-dev`, and `libgtk-3-dev`.
-  > Note: on Linux the default primary shortcut modifier is `Ctrl+`, which
-  > intercepts terminal keys such as `Ctrl+D` and `Ctrl+W` unless rebound in
-  > Settings (`Ctrl+,`).
+  > Note: on Windows and Linux the default primary shortcut modifier is `Ctrl+`,
+  > which intercepts terminal keys such as `Ctrl+D` and `Ctrl+W` unless rebound
+  > in Settings (`Ctrl+,`).
 
 ## What you get
 
@@ -102,8 +109,7 @@ and *About*, with live search across all settings:
 - UI scale, font selection & size, reduce motion, side-panel swap, center vs
   compact title bar, vim/arrow navigation, OSC 52 clipboard toggle, opt-in
   background live usage polling, custom CLI commands/flags, and settings reset.
-- Stored in `${XDG_CONFIG_HOME:-~/.config}/ais-shell/settings.json` (corrupt
-  files are backed up to `settings.json.bak` with an alert).
+- Stored in `${XDG_CONFIG_HOME:-~/.config}/ais/settings.json` (migrates automatically from `ais-shell/settings.json`; corrupt files are backed up to `settings.json.bak` with an alert).
 
 ## Keyboard
 
@@ -119,10 +125,10 @@ All listed shortcuts can be rebound or cleared in **Settings → Keyboard**.
 | `⌘W` / `⌘⇧W` | Close pane / Close space (asks confirmation when agents are running) |
 | `⌘]` `⌘[` / `⌘⇧]` `⌘⇧[` | Next / previous pane · Next / previous space |
 | `⌘⌥↑↓` / `⌘⌥←→` | Next / previous pane · Next / previous space (optional `⌘⌥H/J/K/L` vim mode) |
-| `⌘↵` / `⌘⇧R` / `⌘K` | Zoom active pane / Restart pane / Clear scrollback |
+| `⌘↵` / `⌘⇧↵` / `⌘⇧R` / `⌘K` | Zoom active pane / Fullscreen terminal / Restart pane / Clear scrollback |
 | `⌘=` `⌘-` `⌘0` | Bigger / smaller / reset terminal font size |
 | `⌘B` / `⌘⇧E` / `⌘U` | Toggle sidebar / Files / Usage |
-| `⌘⇧A` / `⌘⇧L` | Toggle alerts / Toggle conversations |
+| `⌘⇧G` / `⌘⇧A` / `⌘⇧L` | Toggle agent pills / Toggle alerts / Toggle conversations |
 | `⌘⌥⇧T` / `⌘⌥⇧R` | Cycle light/dark/system mode / Refresh conversations |
 | `⌘,` | Open settings |
 | `⇧PgUp` `⇧PgDn` | Scroll terminal |
@@ -131,25 +137,25 @@ All listed shortcuts can be rebound or cleared in **Settings → Keyboard**.
 
 ## Privacy & Security
 
-- `ais-shell` reads local CLI session histories and SQLite databases without
-  modifying them. It makes no direct network requests of its own.
+- `ais` reads local CLI session histories and SQLite databases without
+  modifying them. It makes no direct network requests except optional signed update checks.
 - Background live usage polling is **disabled by default**; when enabled (or
-  triggered via ↻), it delegates to the local `ais` launcher / official CLIs.
+  triggered via ↻), it delegates to `ais-cli` / official CLIs.
 - Programs cannot read your clipboard via OSC 52, and OSC 52 clipboard writes
   can be disabled in Settings (`Terminal → Allow OSC 52 clipboard writes`).
 
 ## Troubleshooting
 
 - **"CLI not found" when launched from Finder/Dock:** macOS GUI apps start with
-  a minimal `PATH`. `ais-shell` imports your login shell environment once on
+  a minimal `PATH`. `ais` imports your login shell environment once on
   startup (`AIS_FORCE_LOGIN_PATH=1` forces this from a terminal too). You can
   also set an explicit binary path in **Settings → CLIs** or set `AIS_BIN` for
-  the `ais` indexer.
+  `ais-cli`.
 - **macOS Gatekeeper warning:** `bundle.sh` applies an ad-hoc signature (`-`).
   If macOS blocks a copied bundle, run `xattr -cr /Applications/ais.app` or
   Right-click → Open.
 - **Logs:** diagnostics and panic backtraces are written to
-  `${XDG_STATE_HOME:-~/.local/state}/ais-shell/ais-shell.log`.
+  `${XDG_STATE_HOME:-~/.local/state}/ais/ais.log` (`%LOCALAPPDATA%\ais\ais.log` on Windows).
 
 ## Development
 

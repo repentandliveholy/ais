@@ -4,10 +4,11 @@ use crate::keys::{Binding, Command as Cmd, MOD, fixed_conflict_reason};
 use crate::log;
 use crate::projects::{CliSnapshot, Project, ScanCache, ScanResult, scan_projects_cached};
 use crate::sessions::{Session, SessionStore, find_ais, truncate};
-use crate::terminal::{LaunchSpec, PaneEvent, QueryColors, SearchMatch, TerminalPane, user_shell};
+use crate::terminal::{LaunchSpec, PaneEvent, QueryColors, SearchMatch, TerminalPane, shell_args, user_shell};
 use crate::theme::{
     DEFAULT_FONT_SIZE, FontChoice, Palette, Settings, SpaceLayout, TerminalPalette, Theme, UiTheme, settings_path,
 };
+use crate::update::{self, Installed, UpdateStatus};
 use crate::usage::UsageStore;
 use crate::view::BOLD_FAMILY;
 use crate::widgets::{choose_folder, load_first, open_external, plural, system_notification};
@@ -26,6 +27,8 @@ pub const APP_TITLE: &str = "ais · AI Sessions";
 pub const MAX_PANES: usize = 4;
 pub const REVEAL_LABEL: &str = if cfg!(target_os = "macos") {
     "Reveal in Finder"
+} else if cfg!(target_os = "windows") {
+    "Show in Explorer"
 } else {
     "Show in file manager"
 };
@@ -83,6 +86,8 @@ pub enum Action {
     FocusNext(bool),
     CycleSpace(bool),
     ToggleZoom,
+    ToggleFullscreenTerminal,
+    ToggleWindowFullscreen,
     ClearScrollback,
     OpenFind,
     InsertText(String),
@@ -91,9 +96,15 @@ pub enum Action {
     Reveal(PathBuf),
     ToggleTheme,
     SetUiTheme(UiTheme),
+    ToggleTitleBar,
     ToggleSidebar,
     ToggleFiles,
     ToggleUsage,
+    ToggleToolbar,
+    ToggleAgents,
+    TogglePaneHeaders,
+    ToggleStatusBar,
+    ShowAllBlocks,
     RefreshUsage,
     FocusAgent(CliKind),
     ShowSessions(bool),
@@ -105,6 +116,8 @@ pub enum Action {
     RefreshProjects,
     RefreshSessions,
     FontSize(f32),
+    CheckUpdates,
+    RestartToUpdate,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -455,10 +468,15 @@ pub struct AisApp {
     pub git_branches: HashMap<PathBuf, (Instant, Option<String>)>,
     pub icon_font: bool,
     pub last_window_rect: Option<Rect>,
+    pub terminal_fullscreen: bool,
+    pub pre_fullscreen_zoomed: Option<bool>,
+    pub update_status: UpdateStatus,
+    pub update_rx: Option<Receiver<Result<Installed, String>>>,
+    pub update_manual: bool,
 }
 
 impl AisApp {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, no_update_check: bool) -> Self {
         let home = home_dir();
         let settings_file = settings_path(&home);
         let (settings, settings_warnings) = Settings::load_checked(&settings_file);
@@ -541,6 +559,11 @@ impl AisApp {
             git_branches: HashMap::new(),
             icon_font: false,
             last_window_rect: None,
+            terminal_fullscreen: false,
+            pre_fullscreen_zoomed: None,
+            update_status: UpdateStatus::Idle,
+            update_rx: None,
+            update_manual: false,
         };
         for warning in settings_warnings {
             log::warn(&warning);
@@ -577,6 +600,9 @@ impl AisApp {
             None => {}
         }
         app.refresh_projects(false);
+        if !no_update_check && update::should_auto_check(app.settings.auto_update) {
+            app.start_update_check(false);
+        }
         app
     }
 
@@ -669,8 +695,17 @@ impl AisApp {
             PathBuf::from("/System/Library/Fonts/SFNS.ttf"),
             PathBuf::from("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
         ]);
+        #[cfg(windows)]
+        if let Some(windir) = env::var_os("WINDIR").map(PathBuf::from) {
+            let fonts_dir = windir.join("Fonts");
+            ui_candidates.extend([fonts_dir.join("seguisb.ttf"), fonts_dir.join("segoeui.ttf")]);
+        }
         if self.settings.ui_font == FontChoice::System {
             ui_candidates.insert(0, PathBuf::from("/System/Library/Fonts/SFNS.ttf"));
+            #[cfg(windows)]
+            if let Some(windir) = env::var_os("WINDIR").map(PathBuf::from) {
+                ui_candidates.insert(0, windir.join("Fonts/segoeui.ttf"));
+            }
         }
         let ui_font = load_first(&ui_candidates);
         let mut icon_candidates = FontChoice::JetBrains.files(&self.home, "Propo", &["Regular"]);
@@ -691,8 +726,23 @@ impl AisApp {
             PathBuf::from("/System/Library/Fonts/Menlo.ttc"),
             PathBuf::from("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"),
         ]);
+        #[cfg(windows)]
+        if let Some(windir) = env::var_os("WINDIR").map(PathBuf::from) {
+            let fonts_dir = windir.join("Fonts");
+            mono_candidates.extend([
+                fonts_dir.join("CascadiaMono.ttf"),
+                fonts_dir.join("CascadiaCode.ttf"),
+                fonts_dir.join("consola.ttf"),
+            ]);
+        }
         if self.settings.term_font == FontChoice::System {
             mono_candidates.insert(0, PathBuf::from("/System/Library/Fonts/SFNSMono.ttf"));
+            #[cfg(windows)]
+            if let Some(windir) = env::var_os("WINDIR").map(PathBuf::from) {
+                let fonts_dir = windir.join("Fonts");
+                mono_candidates.insert(0, fonts_dir.join("consola.ttf"));
+                mono_candidates.insert(0, fonts_dir.join("CascadiaMono.ttf"));
+            }
         }
         let mono = load_first(&mono_candidates);
         let mut bold_candidates = self.settings.term_font.files(&self.home, "Mono", &["Bold", "SemiBold"]);
@@ -700,16 +750,38 @@ impl AisApp {
         bold_candidates.push(PathBuf::from(
             "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
         ));
+        #[cfg(windows)]
+        if let Some(windir) = env::var_os("WINDIR").map(PathBuf::from) {
+            bold_candidates.push(windir.join("Fonts/consolab.ttf"));
+        }
         let mono_bold = load_first(&bold_candidates);
-        let cjk = load_first(&[
+        #[cfg_attr(not(windows), allow(unused_mut))]
+        let mut cjk_candidates = vec![
             PathBuf::from("/System/Library/Fonts/Hiragino Sans GB.ttc"),
             PathBuf::from("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
             PathBuf::from("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"),
-        ]);
-        let symbols = load_first(&[
+        ];
+        #[cfg(windows)]
+        if let Some(windir) = env::var_os("WINDIR").map(PathBuf::from) {
+            let fonts_dir = windir.join("Fonts");
+            cjk_candidates.extend([
+                fonts_dir.join("YuGothR.ttc"),
+                fonts_dir.join("meiryo.ttc"),
+                fonts_dir.join("msyh.ttc"),
+            ]);
+        }
+        let cjk = load_first(&cjk_candidates);
+        #[cfg_attr(not(windows), allow(unused_mut))]
+        let mut symbol_candidates = vec![
             PathBuf::from("/System/Library/Fonts/Apple Symbols.ttf"),
             PathBuf::from("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-        ]);
+        ];
+        #[cfg(windows)]
+        if let Some(windir) = env::var_os("WINDIR").map(PathBuf::from) {
+            let fonts_dir = windir.join("Fonts");
+            symbol_candidates.extend([fonts_dir.join("seguiemj.ttf"), fonts_dir.join("seguisym.ttf")]);
+        }
+        let symbols = load_first(&symbol_candidates);
         let mut add = |name: &str, bytes: Option<Vec<u8>>| -> bool {
             match bytes {
                 Some(bytes) => {
@@ -964,6 +1036,74 @@ impl AisApp {
         }) {
             log::warn(&format!("CLI check thread spawn failed: {error}"));
             self.cli_rx = None;
+        }
+    }
+
+    pub fn start_update_check(&mut self, manual: bool) {
+        if self.update_rx.is_some() {
+            return;
+        }
+        self.update_manual = manual;
+        self.update_status = UpdateStatus::Checking;
+        let (tx, rx) = mpsc::channel();
+        let waker = self.waker.clone();
+        let ais = self.sessions.ais().map(Path::to_path_buf);
+        self.update_rx = Some(rx);
+        if let Err(error) = thread::Builder::new().name("ais-update".into()).spawn(move || {
+            let result = update::check_and_install(ais.as_deref());
+            let _ = tx.send(result);
+            waker();
+        }) {
+            log::warn(&format!("Update check thread spawn failed: {error}"));
+            self.update_rx = None;
+            self.update_status = UpdateStatus::Error(error.to_string());
+        }
+    }
+
+    fn poll_update(&mut self) {
+        let Some(rx) = self.update_rx.as_ref() else {
+            return;
+        };
+        match rx.try_recv() {
+            Ok(result) => {
+                self.update_rx = None;
+                let manual = self.update_manual;
+                self.update_manual = false;
+                match result {
+                    Ok(Installed::Updated(version)) => {
+                        self.update_status = UpdateStatus::Updated(version.clone());
+                        self.notice(
+                            NoticeKind::Success,
+                            format!("ais updated to v{version} — restart to apply"),
+                        );
+                    }
+                    Ok(Installed::UpToDate(version)) => {
+                        self.update_status = UpdateStatus::UpToDate(version.clone());
+                        if manual {
+                            self.notice(NoticeKind::Info, format!("Already up to date (v{version})"));
+                        }
+                    }
+                    Ok(Installed::Available(version, reason)) => {
+                        self.update_status = UpdateStatus::Available {
+                            version: version.clone(),
+                            reason: reason.clone(),
+                        };
+                        self.notice(NoticeKind::Info, format!("ais v{version} is available ({reason})"));
+                    }
+                    Err(error) => {
+                        log::warn(&format!("Update check failed: {error}"));
+                        self.update_status = UpdateStatus::Error(error.clone());
+                        if manual {
+                            self.notice(NoticeKind::Error, format!("Update check failed: {error}"));
+                        }
+                    }
+                }
+            }
+            Err(TryRecvError::Empty) => {}
+            Err(TryRecvError::Disconnected) => {
+                self.update_rx = None;
+                self.update_status = UpdateStatus::Idle;
+            }
         }
     }
 
@@ -1405,6 +1545,7 @@ impl AisApp {
         };
         let cwd = cwd.unwrap_or_else(|| self.spaces[space_index].path.clone());
         let shell = user_shell();
+        let args = shell_args(&shell);
         let name = Path::new(&shell)
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
@@ -1413,7 +1554,7 @@ impl AisApp {
             LaunchSpec {
                 client: CliKind::Shell,
                 program: shell,
-                args: vec!["-l".into()],
+                args,
                 cwd,
                 label: format!("Terminal · {name}"),
             },
@@ -1582,6 +1723,35 @@ impl AisApp {
                     self.pending_focus = space.active_pane().map(|pane| pane.uid);
                 }
             }
+            Action::ToggleFullscreenTerminal => {
+                self.terminal_fullscreen = !self.terminal_fullscreen;
+                if self.terminal_fullscreen {
+                    if let Some(space) = self.active_space.and_then(|i| self.spaces.get_mut(i)) {
+                        if space.panes.len() > 1 {
+                            self.pre_fullscreen_zoomed = Some(space.zoomed);
+                            space.zoomed = true;
+                        } else {
+                            self.pre_fullscreen_zoomed = None;
+                        }
+                        self.pending_focus = space.active_pane().map(|pane| pane.uid);
+                    }
+                } else {
+                    if let Some(prev) = self.pre_fullscreen_zoomed.take()
+                        && let Some(space) = self.active_space.and_then(|i| self.spaces.get_mut(i))
+                    {
+                        space.zoomed = prev && space.panes.len() > 1;
+                    }
+                    self.pending_focus = self
+                        .active_space
+                        .and_then(|i| self.spaces.get(i))
+                        .and_then(Space::active_pane)
+                        .map(|pane| pane.uid);
+                }
+            }
+            Action::ToggleWindowFullscreen => {
+                let fullscreen = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
+                ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(!fullscreen));
+            }
             Action::ClearScrollback => {
                 if let Some(pane) = self.active_pane_mut() {
                     pane.clear_history();
@@ -1627,6 +1797,10 @@ impl AisApp {
                 self.configure_style(ctx);
                 self.mark_settings_dirty();
             }
+            Action::ToggleTitleBar => {
+                self.settings.show_title_bar = !self.settings.show_title_bar;
+                self.mark_settings_dirty();
+            }
             Action::ToggleSidebar => {
                 self.settings.show_sidebar = !self.settings.show_sidebar;
                 self.last_side_right = !self.settings.show_sidebar;
@@ -1634,6 +1808,37 @@ impl AisApp {
             }
             Action::ToggleFiles => self.toggle_right_tab(RightTab::Files),
             Action::ToggleUsage => self.toggle_right_tab(RightTab::Usage),
+            Action::ToggleToolbar => {
+                self.settings.show_toolbar = !self.settings.show_toolbar;
+                self.mark_settings_dirty();
+            }
+            Action::ToggleAgents => {
+                self.settings.show_agents = !self.settings.show_agents;
+                self.mark_settings_dirty();
+            }
+            Action::TogglePaneHeaders => {
+                self.settings.show_pane_headers = !self.settings.show_pane_headers;
+                self.mark_settings_dirty();
+            }
+            Action::ToggleStatusBar => {
+                self.settings.show_status_bar = !self.settings.show_status_bar;
+                self.mark_settings_dirty();
+            }
+            Action::ShowAllBlocks => {
+                self.terminal_fullscreen = false;
+                if let Some(prev) = self.pre_fullscreen_zoomed.take()
+                    && let Some(space) = self.active_space.and_then(|i| self.spaces.get_mut(i))
+                {
+                    space.zoomed = prev && space.panes.len() > 1;
+                }
+                self.settings.show_title_bar = true;
+                self.settings.show_sidebar = true;
+                self.settings.show_toolbar = true;
+                self.settings.show_agents = true;
+                self.settings.show_pane_headers = true;
+                self.settings.show_status_bar = true;
+                self.mark_settings_dirty();
+            }
             Action::SetRightTab(tab) => self.set_right_tab(tab),
             Action::RefreshUsage => self.usage.refresh_live(),
             Action::FocusAgent(kind) => self.focus_agent(kind),
@@ -1693,6 +1898,33 @@ impl AisApp {
                 };
                 self.configure_style(ctx);
                 self.mark_settings_dirty();
+            }
+            Action::CheckUpdates => self.start_update_check(true),
+            Action::RestartToUpdate => {
+                let running_agents: usize = self
+                    .spaces
+                    .iter()
+                    .flat_map(|s| s.panes.iter())
+                    .filter(|p| p.is_running() && p.client().is_some_and(CliKind::is_ai))
+                    .count();
+                if running_agents > 0
+                    && !self.confirm_close(
+                        u64::MAX - 99,
+                        &format!("{} still running", plural(running_agents, "agent")),
+                    )
+                {
+                    return;
+                }
+                self.flush_settings();
+                for space in &mut self.spaces {
+                    for pane in &mut space.panes {
+                        pane.kill_blocking();
+                    }
+                }
+                match update::spawn_restart() {
+                    Ok(()) => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+                    Err(error) => self.notice(NoticeKind::Error, error),
+                }
             }
         }
     }
@@ -1996,6 +2228,7 @@ impl eframe::App for AisApp {
 
         self.poll_scan();
         self.poll_cli_check();
+        self.poll_update();
         self.poll_files();
         self.sessions.poll();
         self.usage.poll();
@@ -2039,27 +2272,39 @@ impl eframe::App for AisApp {
 
         let swap = self.settings.swap_sides;
         ctx.data_mut(|data| data.insert_temp(Id::new("swap-sides"), swap));
-        self.title_bar(ctx);
-        if self.settings.show_status_bar {
-            self.status_bar(ctx);
-        }
-        let narrow = ctx.screen_rect().width() < NARROW_WIDTH;
-        let both = self.settings.show_sidebar && self.right_tab().is_some();
-        let show_sidebar = self.settings.show_sidebar && !(narrow && both && self.last_side_right);
-        let show_right = !(narrow && both && !self.last_side_right);
-        if show_sidebar {
-            self.sidebar(ctx);
-        }
-        match self.right_tab().filter(|_| show_right) {
-            Some(RightTab::Files) => self.files_panel(ctx),
-            Some(RightTab::Usage) => self.usage_panel(ctx),
-            Some(RightTab::Notices) => self.notices_panel(ctx),
-            None => {}
+        if !self.terminal_fullscreen {
+            if self.settings.show_title_bar {
+                self.title_bar(ctx);
+            }
+            if self.settings.show_status_bar {
+                self.status_bar(ctx);
+            }
+            let narrow = ctx.screen_rect().width() < NARROW_WIDTH;
+            let both = self.settings.show_sidebar && self.right_tab().is_some();
+            let show_sidebar = self.settings.show_sidebar && !(narrow && both && self.last_side_right);
+            let show_right = !(narrow && both && !self.last_side_right);
+            if show_sidebar {
+                self.sidebar(ctx);
+            }
+            match self.right_tab().filter(|_| show_right) {
+                Some(RightTab::Files) => self.files_panel(ctx),
+                Some(RightTab::Usage) => self.usage_panel(ctx),
+                Some(RightTab::Notices) => self.notices_panel(ctx),
+                None => {}
+            }
         }
         let palette = self.palette();
+        let central_margin = if self.terminal_fullscreen { 0 } else { 8 };
         egui::CentralPanel::default()
-            .frame(egui::Frame::NONE.fill(palette.bg).inner_margin(egui::Margin::same(8)))
+            .frame(
+                egui::Frame::NONE
+                    .fill(palette.bg)
+                    .inner_margin(egui::Margin::same(central_margin)),
+            )
             .show(ctx, |ui| self.workspace(ui));
+        if self.terminal_fullscreen || !self.settings.show_title_bar {
+            self.floating_chrome_bar(ctx);
+        }
         self.search_dropdown(ctx);
         self.command_palette(ctx);
         self.settings_window(ctx);
@@ -2105,14 +2350,21 @@ pub fn command_action(command: Cmd) -> Action {
         Cmd::RestartPane => Action::RestartPane(u64::MAX),
         Cmd::ClearScrollback => Action::ClearScrollback,
         Cmd::ZoomPane => Action::ToggleZoom,
+        Cmd::FullscreenTerminal => Action::ToggleFullscreenTerminal,
+        Cmd::ToggleWindowFullscreen => Action::ToggleWindowFullscreen,
         Cmd::NextPane => Action::FocusNext(true),
         Cmd::PrevPane => Action::FocusNext(false),
         Cmd::NextSpace => Action::CycleSpace(true),
         Cmd::PrevSpace => Action::CycleSpace(false),
+        Cmd::ToggleTitleBar => Action::ToggleTitleBar,
         Cmd::ToggleSidebar => Action::ToggleSidebar,
         Cmd::ToggleFiles => Action::ToggleFiles,
         Cmd::ToggleUsage => Action::ToggleUsage,
         Cmd::ToggleAlerts => Action::OpenNotices,
+        Cmd::ToggleToolbar => Action::ToggleToolbar,
+        Cmd::ToggleAgents => Action::ToggleAgents,
+        Cmd::TogglePaneHeaders => Action::TogglePaneHeaders,
+        Cmd::ToggleStatusBar => Action::ToggleStatusBar,
         Cmd::ShowConversations => Action::ShowSessions(true),
         Cmd::RefreshSessions => Action::RefreshSessions,
         Cmd::Rescan => Action::RefreshProjects,
@@ -2178,6 +2430,14 @@ mod tests {
             Some(Action::Split(false))
         ));
         assert!(matches!(shortcut_action(s, Key::F, cmd), Some(Action::OpenFind)));
+        assert!(matches!(
+            shortcut_action(s, Key::Enter, cmd | Modifiers::SHIFT),
+            Some(Action::ToggleFullscreenTerminal)
+        ));
+        assert!(matches!(
+            shortcut_action(s, Key::G, cmd | Modifiers::SHIFT),
+            Some(Action::ToggleAgents)
+        ));
         assert!(matches!(
             shortcut_action(s, Key::Num2, cmd),
             Some(Action::SelectSpace(1))
