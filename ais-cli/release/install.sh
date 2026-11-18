@@ -47,7 +47,7 @@ fetch() {
 tmp=$(mktemp -d 2>/dev/null || mktemp -d -t ais)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
-say "Downloading $asset…"
+say "Downloading ${asset}…"
 fetch "$base/$asset" "$tmp/ais" || die "no build for $target in this release"
 fetch "$base/SHA256SUMS" "$tmp/SHA256SUMS" || die "could not download SHA256SUMS"
 
