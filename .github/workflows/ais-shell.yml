@@ -45,7 +45,7 @@ jobs:
           export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=. --remap-path-prefix=$HOME=."
           cargo build --release
           # No pipe: grep -q would close it early and fail strings under pipefail.
-          strings target/release/ais > "$RUNNER_TEMP/strings.txt"
+          strings target/release/ais-gui > "$RUNNER_TEMP/strings.txt"
           if grep -F -q "$HOME/" "$RUNNER_TEMP/strings.txt"; then
             grep -F "$HOME/" "$RUNNER_TEMP/strings.txt" | head -5 >&2
             echo "Build path leaked into release binary" >&2

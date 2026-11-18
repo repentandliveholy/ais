@@ -9,16 +9,16 @@
 ## Установка
 
 Два нативных бинарника (Rust) для **macOS, Linux и Windows**. Без рантайма и зависимостей:
-- **`ais`** — нативное десктопное GUI-приложение (мультипанельный терминал, карточки агентов, отключаемые блоки, полноэкранный терминал, панель лимитов, возобновление сессий)
-- **`ais-cli`** — консольный TUI-браузер сессий и лимитов (также работает как быстрый индексатор для GUI `ais`)
+- **`ais`** (CLI / TUI) — консольный браузер сессий и лимитов (команда остаётся `ais`)
+- **`ais` Desktop GUI (`ais-gui` / `ais.app`)** — нативное десктопное приложение (мультипанельный терминал, карточки агентов, отключаемые блоки, полноэкранный терминал, панель лимитов)
 
-**macOS / Linux (`ais` GUI + `ais-cli`)**
+**macOS / Linux (`ais` CLI + `ais-gui` GUI)**
 
 ```sh
 curl -fsSL https://ais.repentandliveholy.org/install.sh | sh
 ```
 
-**Windows PowerShell (`ais` GUI + `ais-cli`)**
+**Windows PowerShell (`ais` CLI + `ais-gui` GUI)**
 
 ```powershell
 irm https://ais.repentandliveholy.org/install.ps1 | iex

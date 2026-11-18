@@ -9,16 +9,16 @@ English · [Русский](README.ru.md)
 ## Install
 
 Two native binaries (Rust) for **macOS, Linux and Windows**. No runtime, no dependencies:
-- **`ais`** — native desktop GUI workspace (multi-pane terminal, agent pills, toggleable blocks, fullscreen terminal, usage panel, session resume)
-- **`ais-cli`** — terminal launcher & TUI session browser (also serves as the fast session/usage indexer for `ais`)
+- **`ais`** (CLI / TUI) — terminal launcher & session browser (`ais` command stays `ais`)
+- **`ais` Desktop GUI (`ais-gui` / `ais.app`)** — native desktop workspace (multi-pane terminal, agent pills, toggleable blocks, fullscreen terminal, usage panel, session resume)
 
-**macOS / Linux (`ais` GUI + `ais-cli`)**
+**macOS / Linux (`ais` CLI + `ais-gui` Desktop GUI)**
 
 ```sh
 curl -fsSL https://ais.repentandliveholy.org/install.sh | sh
 ```
 
-**Windows PowerShell (`ais` GUI + `ais-cli`)**
+**Windows PowerShell (`ais` CLI + `ais-gui` Desktop GUI)**
 
 ```powershell
 irm https://ais.repentandliveholy.org/install.ps1 | iex

@@ -780,7 +780,7 @@ impl AisApp {
                             for (label, value) in [
                                 ("Version", format!("{APP_TITLE} {}", env!("CARGO_PKG_VERSION"))),
                                 ("License", "MIT (not affiliated with Anthropic, OpenAI, or Google)".into()),
-                                ("ais-cli indexer", ais),
+                                ("ais CLI", ais),
                                 ("Settings", pretty_path(&self.settings_file, &self.home)),
                                 ("Log file", pretty_path(crate::log::log_path(), &self.home)),
                             ] {

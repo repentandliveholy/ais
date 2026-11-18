@@ -2,10 +2,9 @@
 #
 #   irm https://ais.repentandliveholy.org/install.ps1 | iex
 #
-# Downloads `ais.exe` (GUI) and `ais-cli.exe` (CLI/indexer) from the latest
-# GitHub release, checks SHA-256 against SHA256SUMS, installs to
-# %LOCALAPPDATA%\ais\bin, adds that folder to user PATH, and creates a Start Menu
-# shortcut for `ais`.
+# Downloads `ais.exe` (CLI) and `ais-gui.exe` (GUI) from the latest GitHub
+# release, checks SHA-256 against SHA256SUMS, installs to %LOCALAPPDATA%\ais\bin,
+# adds that folder to user PATH, and creates a Start Menu shortcut for `ais` GUI.
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
@@ -37,8 +36,8 @@ try {
         Move-Item -Force $OutFile (Join-Path $Dir $DestName)
     }
 
-    Install-Verified $GuiAsset 'ais.exe'
-    Install-Verified $CliAsset 'ais-cli.exe'
+    Install-Verified $CliAsset 'ais.exe'
+    Install-Verified $GuiAsset 'ais-gui.exe'
 } finally {
     Remove-Item -Recurse -Force $Tmp -ErrorAction SilentlyContinue
 }
@@ -55,13 +54,13 @@ try {
     if ($Programs) {
         $Shell = New-Object -ComObject WScript.Shell
         $Shortcut = $Shell.CreateShortcut((Join-Path $Programs 'ais.lnk'))
-        $Shortcut.TargetPath = Join-Path $Dir 'ais.exe'
+        $Shortcut.TargetPath = Join-Path $Dir 'ais-gui.exe'
         $Shortcut.WorkingDirectory = $env:USERPROFILE
         $Shortcut.Description = 'ais · AI Sessions'
         $Shortcut.Save()
     }
 } catch {}
 
-& (Join-Path $Dir 'ais-cli.exe') --version
-Write-Host "Installed ais (GUI) and ais-cli (CLI) to $Dir"
-Write-Host 'Run: ais (GUI) or ais-cli (terminal)'
+& (Join-Path $Dir 'ais.exe') --version
+Write-Host "Installed ais (CLI) and ais-gui (GUI) to $Dir"
+Write-Host 'Run: ais (CLI) or ais-gui (GUI)'

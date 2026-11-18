@@ -13,7 +13,7 @@ categories = ["command-line-utilities", "development-tools"]
 exclude = ["dist/", ".remember/", ".DS_Store"]
 
 [[bin]]
-name = "ais"
+name = "ais-gui"
 path = "src/main.rs"
 
 [dependencies]

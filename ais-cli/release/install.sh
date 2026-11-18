@@ -1,11 +1,7 @@
 #!/bin/sh
-# ais · AI Sessions installer for macOS and Linux (installs `ais` GUI + `ais-cli`).
+# ais · AI Sessions installer for macOS and Linux (installs `ais` CLI + `ais-gui` desktop app).
 #
 #   curl -fsSL https://ais.repentandliveholy.org/install.sh | sh
-#
-# Downloads both `ais` (GUI) and `ais-cli` (CLI/indexer) from the latest GitHub
-# release, verifies SHA-256 against SHA256SUMS, and installs to $AIS_INSTALL_DIR
-# (default ~/.local/bin).
 set -eu
 
 REPO="https://github.com/repentandliveholy/ais"
@@ -79,13 +75,13 @@ trap 'rm -rf "$tmp"' EXIT INT TERM
 fetch "$base/SHA256SUMS" "$tmp/SHA256SUMS" || die "could not download SHA256SUMS"
 mkdir -p "$DIR"
 
-verify_and_install "$cli_asset" "$DIR/ais-cli" || die "no ais-cli build for $cli_target in this release"
-say "Installed $("$DIR/ais-cli" --version) to $DIR/ais-cli"
+verify_and_install "$cli_asset" "$DIR/ais" || die "no ais CLI build for $cli_target in this release"
+say "Installed $("$DIR/ais" --version) to $DIR/ais"
 
-if verify_and_install "$gui_asset" "$DIR/ais"; then
-  say "Installed $("$DIR/ais" --version) to $DIR/ais"
+if verify_and_install "$gui_asset" "$DIR/ais-gui"; then
+  say "Installed $("$DIR/ais-gui" --version) to $DIR/ais-gui"
 else
-  say "Note: prebuilt GUI binary ($gui_asset) is not available for $gui_target; build from ais-shell/ or use ais-cli."
+  say "Note: prebuilt GUI binary ($gui_asset) is not available for $gui_target; use ais (CLI) or build from ais-shell/."
 fi
 
 case ":$PATH:" in
@@ -94,4 +90,4 @@ case ":$PATH:" in
      say "Add $DIR to PATH, for example:"
      say "  echo 'export PATH=\"$DIR:\$PATH\"' >> ~/.$(basename "${SHELL:-sh}")rc" ;;
 esac
-say "Run: ais (GUI) or ais-cli (terminal)"
+say "Run: ais (CLI) or ais-gui (GUI)"

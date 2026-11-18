@@ -1,5 +1,5 @@
 #!/bin/sh
-# ais-cli · AI Sessions terminal installer for macOS and Linux.
+# ais · AI Sessions CLI installer for macOS and Linux.
 #
 #   curl -fsSL https://ais.repentandliveholy.org/install-cli.sh | sh
 set -eu
@@ -9,7 +9,7 @@ DIR="${AIS_INSTALL_DIR:-$HOME/.local/bin}"
 VERSION="${AIS_VERSION:-latest}"
 
 say() { printf '%s\n' "$*"; }
-die() { printf 'ais-cli install: %s\n' "$*" >&2; exit 1; }
+die() { printf 'ais install: %s\n' "$*" >&2; exit 1; }
 
 case "$(uname -s)" in
   Darwin) os=apple-darwin ;;
@@ -43,19 +43,19 @@ tmp=$(mktemp -d 2>/dev/null || mktemp -d -t ais-cli)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
 say "Downloading ${asset}…"
-fetch "$base/$asset" "$tmp/ais-cli" || die "no build for $target in this release"
+fetch "$base/$asset" "$tmp/ais" || die "no build for $target in this release"
 fetch "$base/SHA256SUMS" "$tmp/SHA256SUMS" || die "could not download SHA256SUMS"
 
 expected=$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1 }' "$tmp/SHA256SUMS")
 [ -n "$expected" ] || die "$asset is missing from SHA256SUMS"
-if command -v sha256sum >/dev/null 2>&1; then actual=$(sha256sum "$tmp/ais-cli" | awk '{print $1}')
-else actual=$(shasum -a 256 "$tmp/ais-cli" | awk '{print $1}'); fi
+if command -v sha256sum >/dev/null 2>&1; then actual=$(sha256sum "$tmp/ais" | awk '{print $1}')
+else actual=$(shasum -a 256 "$tmp/ais" | awk '{print $1}'); fi
 [ "$expected" = "$actual" ] || die "checksum mismatch for $asset"
 
 mkdir -p "$DIR"
-chmod 755 "$tmp/ais-cli"
-mv -f "$tmp/ais-cli" "$DIR/ais-cli"
-say "Installed $("$DIR/ais-cli" --version) to $DIR/ais-cli"
+chmod 755 "$tmp/ais"
+mv -f "$tmp/ais" "$DIR/ais"
+say "Installed $("$DIR/ais" --version) to $DIR/ais"
 
 case ":$PATH:" in
   *":$DIR:"*) ;;
@@ -63,4 +63,4 @@ case ":$PATH:" in
      say "Add $DIR to PATH, for example:"
      say "  echo 'export PATH=\"$DIR:\$PATH\"' >> ~/.$(basename "${SHELL:-sh}")rc" ;;
 esac
-say "Run: ais-cli"
+say "Run: ais"

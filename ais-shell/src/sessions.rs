@@ -210,15 +210,15 @@ pub fn find_ais() -> Option<PathBuf> {
     if let Some(path) = env::var_os("AIS_BIN").map(PathBuf::from).and_then(valid) {
         return Some(path);
     }
-    for name in ["ais-cli", "ais"] {
+    for name in ["ais", "ais-cli"] {
         if let Some(found) = which(name).and_then(valid) {
             return Some(found);
         }
     }
     let exe_names: &[&str] = if cfg!(windows) {
-        &["ais-cli.exe", "ais.exe"]
+        &["ais.exe", "ais-cli.exe"]
     } else {
-        &["ais-cli", "ais"]
+        &["ais", "ais-cli"]
     };
     if let Ok(exe) = env::current_exe()
         && let Some(dir) = exe.parent()

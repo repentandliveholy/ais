@@ -231,14 +231,14 @@
             <button type="button" role="tab" data-os="win" aria-selected="false">Windows</button>
           </div>
           <div class="editions" role="tablist">
-            <button type="button" role="tab" data-ed="gui" aria-selected="true" data-i18n="edGui">ais (GUI + CLI)</button>
-            <button type="button" role="tab" data-ed="cli" aria-selected="false" data-i18n="edCli">ais-cli (CLI only)</button>
+            <button type="button" role="tab" data-ed="gui" aria-selected="true" data-i18n="edGui">GUI + CLI</button>
+            <button type="button" role="tab" data-ed="cli" aria-selected="false" data-i18n="edCli">CLI only</button>
           </div>
         </div>
         <div class="code"><span class="prompt" id="prompt">$</span><span id="cmd">curl -fsSL https://ais.repentandliveholy.org/install.sh | sh</span>
           <button class="copy" type="button" id="copy" data-i18n="copy">Copy</button>
         </div>
-        <p class="note" id="installNote" data-i18n="note">Installs <code>ais</code> (GUI) and <code>ais-cli</code> to ~/.local/bin with SHA-256 verification.</p>
+        <p class="note" id="installNote" data-i18n="note">Installs <code>ais</code> (CLI) and <code>ais-gui</code> (GUI) to ~/.local/bin with SHA-256 verification.</p>
       </div>
 
       <div class="editions-grid">
@@ -356,12 +356,12 @@
         badge: "Нативные GUI и CLI · macOS · Windows · Linux",
         title: "Все диалоги.<br>Один вход.",
         lead: "Два быстрых приложения на Rust для ваших AI-CLI: <strong>ais</strong> (нативный мультипанельный десктоп-GUI) и <strong>ais-cli</strong> (лёгкий терминальный TUI). Проекты, лимиты 5ч/неделя и возврат в любую сессию.",
-        edGui: "ais (GUI + CLI)", edCli: "ais-cli (только CLI)",
+        edGui: "GUI + CLI", edCli: "только CLI",
         copy: "Копировать", copied: "Скопировано",
-        note: "Установит <code>ais</code> (GUI) и <code>ais-cli</code> в ~/.local/bin с проверкой SHA-256.",
-        noteWin: "Установит <code>ais.exe</code> (GUI) и <code>ais-cli.exe</code> в %LOCALAPPDATA%\\ais\\bin, добавит в PATH и создаст ярлык в Пуске.",
-        noteCli: "Установит только терминальный <code>ais-cli</code> в ~/.local/bin с проверкой SHA-256.",
-        noteCliWin: "Установит только терминальный <code>ais-cli.exe</code> в %LOCALAPPDATA%\\ais\\bin и добавит папку в PATH.",
+        note: "Установит <code>ais</code> (CLI) и <code>ais-gui</code> (GUI) в ~/.local/bin с проверкой SHA-256.",
+        noteWin: "Установит <code>ais.exe</code> (CLI) и <code>ais-gui.exe</code> (GUI) в %LOCALAPPDATA%\\ais\\bin, добавит в PATH и создаст ярлык в Пуске.",
+        noteCli: "Установит только терминальный <code>ais</code> в ~/.local/bin с проверкой SHA-256.",
+        noteCliWin: "Установит только терминальный <code>ais.exe</code> в %LOCALAPPDATA%\\ais\\bin и добавит папку в PATH.",
         guiBadge: "Десктоп GUI",
         guiDesc: "Нативное окно с GPU-рендерингом для macOS, Windows (ConPTY) и Linux. Без Electron и рантайма.",
         g1: "До 4 сплит-терминалов на проект (движок alacritty + kitty-клавиши)",
@@ -401,12 +401,12 @@
         badge: "GUI et CLI natifs · macOS · Windows · Linux",
         title: "Toutes les conversations.<br>Un seul point d’entrée.",
         lead: "Deux outils Rust rapides pour vos CLI d’IA : <strong>ais</strong> (interface bureau multi-panneaux) et <strong>ais-cli</strong> (TUI terminal léger). Parcourez vos projets, suivez vos limites 5 h/semaine et reprenez toute session en un clic.",
-        edGui: "ais (GUI + CLI)", edCli: "ais-cli (CLI seul)",
+        edGui: "GUI + CLI", edCli: "CLI seul",
         copy: "Copier", copied: "Copié",
-        note: "Installe <code>ais</code> (GUI) et <code>ais-cli</code> dans ~/.local/bin avec vérification SHA-256.",
-        noteWin: "Installe <code>ais.exe</code> (GUI) et <code>ais-cli.exe</code> dans %LOCALAPPDATA%\\ais\\bin, ajoute au PATH et crée un raccourci Démarrer.",
-        noteCli: "Installe uniquement le CLI terminal <code>ais-cli</code> dans ~/.local/bin avec vérification SHA-256.",
-        noteCliWin: "Installe uniquement <code>ais-cli.exe</code> dans %LOCALAPPDATA%\\ais\\bin et ajoute le dossier au PATH.",
+        note: "Installe <code>ais</code> (CLI) et <code>ais-gui</code> (GUI) dans ~/.local/bin avec vérification SHA-256.",
+        noteWin: "Installe <code>ais.exe</code> (CLI) et <code>ais-gui.exe</code> (GUI) dans %LOCALAPPDATA%\\ais\\bin, ajoute au PATH et crée un raccourci Démarrer.",
+        noteCli: "Installe uniquement le CLI terminal <code>ais</code> dans ~/.local/bin avec vérification SHA-256.",
+        noteCliWin: "Installe uniquement <code>ais.exe</code> dans %LOCALAPPDATA%\\ais\\bin et ajoute le dossier au PATH.",
         guiBadge: "Application GUI",
         guiDesc: "Espace de travail natif GPU pour macOS, Windows (ConPTY) et Linux. Sans Electron ni runtime.",
         g1: "Jusqu’à 4 panneaux terminal par projet (moteur alacritty + touches kitty)",
@@ -456,9 +456,9 @@
     const english = {};
     document.querySelectorAll("[data-i18n]").forEach(el => { english[el.dataset.i18n] = el.innerHTML; });
     english.copied = "Copied";
-    english.noteWin = "Installs <code>ais.exe</code> (GUI) and <code>ais-cli.exe</code> to %LOCALAPPDATA%\\ais\\bin, adds to PATH, and creates a Start Menu shortcut.";
-    english.noteCli = "Installs only the terminal <code>ais-cli</code> binary to ~/.local/bin with SHA-256 verification.";
-    english.noteCliWin = "Installs only <code>ais-cli.exe</code> to %LOCALAPPDATA%\\ais\\bin and adds the folder to PATH.";
+    english.noteWin = "Installs <code>ais.exe</code> (CLI) and <code>ais-gui.exe</code> (GUI) to %LOCALAPPDATA%\\ais\\bin, adds to PATH, and creates a Start Menu shortcut.";
+    english.noteCli = "Installs only the terminal <code>ais</code> CLI binary to ~/.local/bin with SHA-256 verification.";
+    english.noteCliWin = "Installs only <code>ais.exe</code> CLI to %LOCALAPPDATA%\\ais\\bin and adds the folder to PATH.";
     let lang = "en", os = /Win/.test(navigator.platform) ? "win" : "unix", edition = "gui";
     const t = key => (I18N[lang] && I18N[lang][key]) || english[key];
     function store(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }

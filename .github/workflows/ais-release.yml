@@ -40,7 +40,7 @@ jobs:
           export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=. --remap-path-prefix=$HOME=."
           cargo build --release --locked --target ${{ matrix.target }}
           mkdir -p ../dist
-          cp target/${{ matrix.target }}/release/ais ../dist/ais-gui-${{ matrix.target }}
+          cp target/${{ matrix.target }}/release/ais-gui ../dist/ais-gui-${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.target }}
@@ -96,7 +96,7 @@ jobs:
           export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=. --remap-path-prefix=$HOME=."
           cargo build --release --locked --target x86_64-unknown-linux-gnu
           mkdir -p ../dist
-          cp target/x86_64-unknown-linux-gnu/release/ais ../dist/ais-gui-x86_64-unknown-linux-gnu
+          cp target/x86_64-unknown-linux-gnu/release/ais-gui ../dist/ais-gui-x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@v4
         with:
           name: gui-linux
@@ -117,7 +117,7 @@ jobs:
           export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=. --remap-path-prefix=$HOME=."
           cargo build --release --locked --target x86_64-pc-windows-msvc
           mkdir -p ../dist
-          cp target/x86_64-pc-windows-msvc/release/ais.exe ../dist/ais-gui-x86_64-pc-windows-msvc.exe
+          cp target/x86_64-pc-windows-msvc/release/ais-gui.exe ../dist/ais-gui-x86_64-pc-windows-msvc.exe
       - uses: actions/upload-artifact@v4
         with:
           name: gui-windows

@@ -119,7 +119,7 @@ Usage: ais [PATH] [--run CLI]
   -V, --version      print the version
 
 Environment:
-  AIS_BIN               path to `ais-cli` (conversation lists, usage limits)
+  AIS_BIN               path to `ais` CLI (conversation lists, usage limits)
   AIS_NO_UPDATE=1       disable background auto-update checks
   AIS_FORCE_LOGIN_PATH  import login shell environment even when started from a terminal";
 

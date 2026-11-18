@@ -18,7 +18,7 @@ export RUSTFLAGS="${RUSTFLAGS:-} ${REMAP_FLAGS}"
 
 cargo build --release
 
-BIN="target/release/ais"
+BIN="target/release/ais-gui"
 if strings "$BIN" | grep -F -q "${HOME}"; then
   echo "Error: release binary contains build-machine home path (${HOME})" >&2
   exit 1
