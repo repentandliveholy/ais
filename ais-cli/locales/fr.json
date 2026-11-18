@@ -249,8 +249,6 @@
 "Claude CLI · live": "CLI Claude · en direct",
 "Claude CLI · cached": "CLI Claude · en cache",
 "Claude /usage did not provide plan limits": "Claude /usage n’a pas fourni les limites du forfait",
-"Claude CLI cannot see a login in this environment; check claude auth status in the same terminal": "La CLI Claude ne voit aucune connexion ici ; vérifiez claude auth status dans le même terminal",
-"Claude requires workspace trust; open claude in this directory first": "Claude exige la confiance de l’espace de travail ; ouvrez d’abord claude dans ce dossier",
 "Claude could not load plan limits; check /usage in the official CLI": "Claude n’a pas pu charger les limites du forfait ; vérifiez /usage dans la CLI officielle",
 "Unsupported agy usage report; expected official quota rows": "Rapport d’usage agy non pris en charge ; lignes de quota officielles attendues",
 "Unsupported agy quota window": "Fenêtre de quota agy non prise en charge",
@@ -394,5 +392,15 @@
 "ais updated to {version} · rr restarts into the new version": "ais mis à jour vers {version} · rr redémarre dans la nouvelle version",
 "ais {version} is available · run ais --update": "ais {version} est disponible · lancez ais --update",
 "ais {version} is available, but this copy cannot be replaced ({reason})": "ais {version} est disponible, mais cette copie ne peut pas être remplacée ({reason})",
-"ais {version} · {target} · checking for updates…": "ais {version} · {target} · recherche de mises à jour…"
+"ais {version} · {target} · checking for updates…": "ais {version} · {target} · recherche de mises à jour…",
+"Claude asks whether to trust {dir}: run claude in any project folder once and answer Yes": "Claude demande s’il faut faire confiance à {dir} : lancez claude une fois dans un dossier de projet et répondez Yes",
+"Claude is not logged in: run claude and type /login": "Claude n’est pas connecté : lancez claude et tapez /login",
+"Claude Code not installed": "Claude Code n’est pas installé",
+"Codex CLI not installed": "La CLI Codex n’est pas installée",
+"Antigravity CLI not installed": "La CLI Antigravity n’est pas installée",
+"reinstall {client} or check that it starts from a terminal": "réinstallez {client} ou vérifiez qu’il se lance depuis un terminal",
+"the CLI answered too slowly; press R to retry": "la CLI a répondu trop lentement ; appuyez sur R pour réessayer",
+"run codex login in a terminal (sign in with ChatGPT), then press R": "exécutez codex login dans un terminal (connexion avec ChatGPT), puis appuyez sur R",
+"run claude, type /usage and check that limits show there": "lancez claude, tapez /usage et vérifiez que les limites s’y affichent",
+"open Antigravity and sign in, then press R": "ouvrez Antigravity et connectez-vous, puis appuyez sur R"
 }

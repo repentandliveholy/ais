@@ -1044,21 +1044,68 @@ fn claude_identity(binary: &Path, env: &Env, cwd: &Path, cancel: &Cancel, timeou
     }
 }
 
+/// Parse JSON, tolerating lone UTF-16 surrogate escapes (`\ud83d` without its
+/// pair). Claude Code can save a prompt cut in the middle of an emoji, and
+/// strict serde_json would then reject the whole `.claude.json`.
+pub fn lenient_json(text: &str) -> Option<Value> {
+    if let Ok(value) = serde_json::from_str(text) {
+        return Some(value);
+    }
+    let bytes = text.as_bytes();
+    let hex = |at: usize| -> Option<u16> {
+        let digits = text.get(at..at + 4)?;
+        u16::from_str_radix(digits, 16).ok()
+    };
+    let escape_at =
+        |at: usize| -> Option<u16> { (bytes.get(at) == Some(&b'\\') && bytes.get(at + 1) == Some(&b'u')).then(|| hex(at + 2)).flatten() };
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0;
+    let mut last = 0;
+    while i < bytes.len() {
+        if bytes[i] != b'\\' {
+            i += 1;
+            continue;
+        }
+        let Some(unit) = escape_at(i) else {
+            i += 2; // any other escape, including an escaped backslash
+            continue;
+        };
+        let high = (0xD800..0xDC00).contains(&unit);
+        let low = (0xDC00..0xE000).contains(&unit);
+        let paired = high && escape_at(i + 6).is_some_and(|next| (0xDC00..0xE000).contains(&next));
+        if paired {
+            i += 12;
+        } else if high || low {
+            out.push_str(&text[last..i]);
+            out.push_str("\\ufffd");
+            i += 6;
+            last = i;
+        } else {
+            i += 6;
+        }
+    }
+    out.push_str(&text[last..]);
+    serde_json::from_str(&out).ok()
+}
+
 /// A folder this Claude config already trusts, so /usage never needs a prompt.
-pub fn trusted_dir(config: &Path, fallback: &Path) -> PathBuf {
+pub fn trusted_dir(config: &Path, fallback: &Path, home: &Path) -> PathBuf {
     let Ok(meta) = std::fs::metadata(config) else { return fallback.to_path_buf() };
     if meta.len() > 64 * 1024 * 1024 {
         return fallback.to_path_buf();
     }
     let Ok(text) = std::fs::read_to_string(config) else { return fallback.to_path_buf() };
-    let Ok(Value::Object(data)) = serde_json::from_str::<Value>(&text) else { return fallback.to_path_buf() };
+    let Some(Value::Object(data)) = lenient_json(&text) else { return fallback.to_path_buf() };
     let Some(Value::Object(projects)) = data.get("projects") else { return fallback.to_path_buf() };
     let trusted = |info: &Value| info.get("hasTrustDialogAccepted").is_some_and(truthy);
-    if projects.get(&*fallback.to_string_lossy()).is_some_and(trusted) {
+    // Claude never keeps trust for the home folder (or its ancestors): "Yes
+    // lasts for this session only", so a saved flag there still prompts.
+    let usable = |path: &Path| path.is_dir() && !home.starts_with(path);
+    if usable(fallback) && projects.get(&*fallback.to_string_lossy()).is_some_and(trusted) {
         return fallback.to_path_buf();
     }
     for (path, info) in projects {
-        if trusted(info) && Path::new(path).is_dir() {
+        if trusted(info) && usable(Path::new(path)) {
             return PathBuf::from(path);
         }
     }
@@ -1212,7 +1259,7 @@ fn fetch_claude(collector: &Collector, binary: &Path, cancel: &Cancel, timeout: 
         };
         identities.entry(key.clone()).or_insert_with(|| (status.clone(), Vec::new())).1.push(store.clone());
         let config = if store.1 { collector.home.join(".claude.json") } else { store.0.join(".claude.json") };
-        envs.entry(key).or_insert_with(|| (env, trusted_dir(&config, &cwd)));
+        envs.entry(key).or_insert_with(|| (env, trusted_dir(&config, &cwd, &collector.home)));
     }
     let keys: Vec<String> = identities.keys().cloned().collect();
     let results: Vec<(Account, Vec<Limit>, String)> = std::thread::scope(|scope| {
@@ -1329,6 +1376,31 @@ fn fetch(client: &str, collector: &Collector, cancel: &Cancel, timeout: f64) -> 
     }
 }
 
+fn not_installed(client: &str) -> String {
+    match client {
+        "claude" => tr("Claude Code not installed"),
+        "codex" => tr("Codex CLI not installed"),
+        _ => tr("Antigravity CLI not installed"),
+    }
+}
+
+/// One plain next step for a failed provider, shown after its error.
+fn error_hint(client: &str, error: &UsageError) -> Option<String> {
+    let text = error.safe();
+    let timed_out = matches!(error, UsageError::Timeout(_));
+    Some(match (client, error) {
+        (_, UsageError::Os(_)) => trf!("reinstall {client} or check that it starts from a terminal", client = client),
+        ("deepseek", _) => return None,
+        _ if timed_out => tr("the CLI answered too slowly; press R to retry"),
+        ("codex", _) => tr("run codex login in a terminal (sign in with ChatGPT), then press R"),
+        ("claude", _) if text.starts_with(&tr("Claude /usage did not provide plan limits")) => {
+            tr("run claude, type /usage and check that limits show there")
+        }
+        ("claude", _) => return None, // login and trust messages already say what to do
+        _ => tr("open Antigravity and sign in, then press R"),
+    })
+}
+
 pub fn fetch_live_usage(collector: &Collector, cancel: &Cancel, timeout: f64) -> Result<Usage, UsageError> {
     if cancel.is_set() {
         return Err(UsageError::Cancelled);
@@ -1362,10 +1434,22 @@ pub fn fetch_live_usage(collector: &Collector, cancel: &Cancel, timeout: f64) ->
                 usage.live = true;
             }
             Err(UsageError::Cancelled) => return Err(UsageError::Cancelled),
+            Err(error) if error.safe() == tr("Official CLI not installed") => {
+                // Not using a provider is not an error: show a neutral row only.
+                if !usage.limits.iter().any(|r| r.provider == provider && r.status != "unavailable") {
+                    usage.limits.retain(|r| r.provider != provider);
+                    usage.limits.push(unavailable(provider, &not_installed(client)));
+                }
+            }
             Err(error) => {
                 // OS exception text can contain paths; provider stderr and RPC
                 // error messages can contain identities. Show only safe reasons.
-                usage.errors.push(format!("{client}: {}", error.safe()));
+                let mut message = format!("{client}: {}", error.safe());
+                if let Some(hint) = error_hint(client, &error) {
+                    message.push_str(" → ");
+                    message.push_str(&hint);
+                }
+                usage.errors.push(message);
                 if !usage.limits.iter().any(|r| r.provider == provider && r.status != "unavailable") {
                     usage.limits.retain(|r| r.provider != provider);
                     usage.limits.push(unavailable(provider, "Limits unavailable; see source errors"));
@@ -1814,6 +1898,35 @@ pub fn usage_strip_lines(usage: &Usage, strip_width: i64, current: f64) -> Vec<V
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lenient_json_repairs_lone_surrogates() {
+        let broken = r#"{"a": "cut \ud83d", "b": "ok \ud83d\ude00", "c": "lone \udc00", "d": "\\ud83d"}"#;
+        assert!(serde_json::from_str::<Value>(broken).is_err());
+        let value = lenient_json(broken).unwrap();
+        assert_eq!(value["a"], "cut \u{fffd}");
+        assert_eq!(value["b"], "ok 😀");
+        assert_eq!(value["c"], "lone \u{fffd}");
+        assert_eq!(value["d"], "\\ud83d");
+    }
+
+    #[test]
+    fn trusted_dir_never_picks_home() {
+        let root = std::env::temp_dir().join(format!("ais-trust-{}", std::process::id()));
+        let home = root.join("home");
+        let project = home.join("proj");
+        std::fs::create_dir_all(&project).unwrap();
+        let config = root.join("claude.json");
+        let body = serde_json::json!({"projects": {
+            root.to_string_lossy(): {"hasTrustDialogAccepted": true},
+            home.to_string_lossy(): {"hasTrustDialogAccepted": true},
+            project.to_string_lossy(): {"hasTrustDialogAccepted": true},
+        }});
+        std::fs::write(&config, body.to_string()).unwrap();
+        assert_eq!(trusted_dir(&config, &home, &home), project);
+        assert_eq!(trusted_dir(&config, &project, &home), project);
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn native_reset_text_becomes_epoch_only_for_exact_forms() {
