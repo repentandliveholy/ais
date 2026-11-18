@@ -19,6 +19,7 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
@@ -62,6 +63,40 @@ pub struct View {
     pub usage: Option<Usage>,
     pub usage_live_at: f64,
     pub usage_refreshing: bool,
+    /// Bumped whenever the session list changes, so cached rows are rebuilt.
+    pub data_rev: u64,
+    memo: std::cell::RefCell<Memo>,
+}
+
+/// Everything that decides which rows are visible.
+#[derive(Clone, PartialEq)]
+struct EntriesKey {
+    data: (usize, usize, u64),
+    tab: &'static str,
+    scope: &'static str,
+    cwd: String,
+    client: String,
+    query: String,
+    children: bool,
+    archived: bool,
+    tree: bool,
+    project_path: Option<String>,
+    folder_path: Option<String>,
+    pins: HashSet<String>,
+}
+
+/// Rows and per-client counts from the last frame. Filtering, sorting and
+/// grouping all sessions is far too slow to redo on every scroll step.
+#[derive(Clone, Default)]
+struct Memo {
+    entries: Option<(EntriesKey, Rc<Vec<Entry>>)>,
+    counts: Option<(EntriesKey, Rc<HashMap<&'static str, usize>>)>,
+}
+
+impl std::fmt::Debug for Memo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Memo")
+    }
 }
 
 impl View {
@@ -104,6 +139,25 @@ impl View {
             usage: None,
             usage_live_at: 0.0,
             usage_refreshing: false,
+            data_rev: 0,
+            memo: Default::default(),
+        }
+    }
+
+    fn entries_key(&self, sessions: &[Session]) -> EntriesKey {
+        EntriesKey {
+            data: (sessions.as_ptr() as usize, sessions.len(), self.data_rev),
+            tab: self.tab,
+            scope: self.scope,
+            cwd: self.cwd.clone(),
+            client: self.client.clone(),
+            query: self.query.clone(),
+            children: self.children,
+            archived: self.archived,
+            tree: self.tree,
+            project_path: self.project_path.clone(),
+            folder_path: self.folder_path.clone(),
+            pins: self.pins.clone(),
         }
     }
 
@@ -169,7 +223,53 @@ pub fn scoped_sessions<'a>(sessions: &'a [Session], v: &View) -> std::borrow::Co
     }
 }
 
-pub fn visible_entries(sessions: &[Session], v: &View) -> Vec<Entry> {
+/// Visible rows, recomputed only when the data or a filter changed.
+pub fn visible_entries(sessions: &[Session], v: &View) -> Rc<Vec<Entry>> {
+    let key = v.entries_key(sessions);
+    if let Some((cached, rows)) = &v.memo.borrow().entries
+        && *cached == key
+    {
+        return rows.clone();
+    }
+    let rows = Rc::new(compute_entries(sessions, v));
+    v.memo.borrow_mut().entries = Some((key, rows.clone()));
+    rows
+}
+
+/// Sessions per client for the client chips (ignores client, query and pins).
+fn client_counts(sessions: &[Session], v: &View) -> Rc<HashMap<&'static str, usize>> {
+    let mut key = v.entries_key(sessions);
+    key.client.clear();
+    key.query.clear();
+    key.pins.clear();
+    key.tree = false;
+    key.folder_path = None;
+    key.scope = if v.tab == "projects" || v.project_path.is_some() { "all" } else { v.scope };
+    key.tab = "";
+    if let Some((cached, counts)) = &v.memo.borrow().counts
+        && *cached == key
+    {
+        return counts.clone();
+    }
+    let counted = filter_sessions(
+        &scoped_sessions(sessions, v),
+        &Filter {
+            cwd: &v.cwd,
+            scope: key.scope,
+            client: "all",
+            query: "",
+            children: v.children,
+            archived: v.archived,
+            pins: crate::model::empty_pins(),
+        },
+    );
+    let counts: Rc<HashMap<&'static str, usize>> =
+        Rc::new(CLIENTS.iter().map(|c| (*c, counted.iter().filter(|s| s.client == *c).count())).collect());
+    v.memo.borrow_mut().counts = Some((key, counts.clone()));
+    counts
+}
+
+fn compute_entries(sessions: &[Session], v: &View) -> Vec<Entry> {
     if v.tab == "projects" {
         if let Some(folder) = &v.folder_path {
             let entries = folder_entries(sessions, folder, &v.grouping());
@@ -626,20 +726,7 @@ pub fn render(sessions: &[Session], v: &mut View, cols: usize, rows: usize, erro
     if cols >= 80 {
         screen.put(header, cols - width(&hint) as i64 - 3, &hint, "muted");
     }
-    let scope = if v.tab == "projects" || v.project_path.is_some() { "all" } else { v.scope };
-    let counted = filter_sessions(
-        &scoped_sessions(sessions, v),
-        &Filter {
-            cwd: &v.cwd,
-            scope,
-            client: "all",
-            query: "",
-            children: v.children,
-            archived: v.archived,
-            pins: crate::model::empty_pins(),
-        },
-    );
-    let counts: HashMap<&str, usize> = CLIENTS.iter().map(|c| (*c, counted.iter().filter(|s| s.client == *c).count())).collect();
+    let counts = client_counts(sessions, v);
     let mut x = 2;
     for client in std::iter::once("all").chain(CLIENTS) {
         let name = if client == "all" { tr("All") } else { label(client).to_string() };
@@ -1451,6 +1538,7 @@ pub fn browse(collector: &mut Collector, view: &mut View) -> std::io::Result<Out
                     }
                     collector.errors = errors;
                     sessions = rows.into_iter().map(|s| detail_cache.get(&s.key()).cloned().unwrap_or(s)).collect();
+                    view.data_rev += 1;
                     apply_selection(view, &sessions, &mut restore_key, &old_key, select_first_while_loading, false);
                     view.loaded = false;
                 }
@@ -1458,6 +1546,7 @@ pub fn browse(collector: &mut Collector, view: &mut View) -> std::io::Result<Out
                     collector.errors = errors;
                     collector.sources = sources;
                     sessions = rows.into_iter().map(|s| detail_cache.get(&s.key()).cloned().unwrap_or(s)).collect();
+                    view.data_rev += 1;
                     apply_selection(view, &sessions, &mut restore_key, &old_key, select_first_while_loading, true);
                     view.loaded = true;
                     refreshing_history = false;
@@ -1478,6 +1567,7 @@ pub fn browse(collector: &mut Collector, view: &mut View) -> std::io::Result<Out
                             *s = (*session).clone();
                         }
                     }
+                    view.data_rev += 1;
                     detail_cache.insert(key, *session);
                     view.busy_detail = false;
                 }
