@@ -38,6 +38,16 @@ fn main() {
     // A panic must never leave the terminal in raw/alternate-screen mode.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
+        // `ais --list | head` closes stdout early: end quietly like other CLIs.
+        let message = info
+            .payload()
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| info.payload().downcast_ref::<&str>().copied())
+            .unwrap_or("");
+        if message.contains("Broken pipe") || message.contains("os error 32") || message.contains("os error 232") {
+            std::process::exit(0);
+        }
         ui::leave_terminal_if_active();
         default_hook(info);
     }));

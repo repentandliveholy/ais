@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   macos:
-    runs-on: macos-14
+    runs-on: macos-latest
     strategy:
       matrix:
         target: [aarch64-apple-darwin, x86_64-apple-darwin]
@@ -77,11 +77,23 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.92"
+      - name: Skip releases published by hand
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' ais-cli/Cargo.toml | head -1)
+          # A release published from verified local builds is never overwritten.
+          if gh release view "v$VERSION" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "SKIP=true" >> "$GITHUB_ENV"
+            echo "Release v$VERSION already exists; keeping its assets."
+          fi
       - uses: actions/download-artifact@v4
+        if: env.SKIP != 'true'
         with:
           path: dist
           merge-multiple: true
       - name: Manifest, checksums and signature
+        if: env.SKIP != 'true'
         env:
           AIS_SIGNING_KEY: ${{ secrets.AIS_SIGNING_KEY }}
         run: |
@@ -93,13 +105,9 @@ jobs:
           (cd dist && sha256sum ais-* > SHA256SUMS)
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
       - name: GitHub release
+        if: env.SKIP != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # A release published by hand (verified local builds) is never overwritten.
-          if gh release view "v$VERSION" >/dev/null 2>&1; then
-            echo "Release v$VERSION already exists; keeping its assets."
-            exit 0
-          fi
           gh release create "v$VERSION" dist/* --title "ais $VERSION" \
             --notes-file ais-cli/release/notes.md --verify-tag
