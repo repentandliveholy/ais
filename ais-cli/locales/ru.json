@@ -249,8 +249,6 @@
 "Claude CLI · live": "Claude CLI · актуальные",
 "Claude CLI · cached": "Claude CLI · кеш",
 "Claude /usage did not provide plan limits": "Claude /usage не вернул лимиты подписки",
-"Claude CLI cannot see a login in this environment; check claude auth status in the same terminal": "Claude CLI не видит вход в этой среде; проверьте claude auth status в том же терминале",
-"Claude requires workspace trust; open claude in this directory first": "Claude требует доверия к каталогу; сначала откройте в нём claude",
 "Claude could not load plan limits; check /usage in the official CLI": "Claude не смог загрузить лимиты; проверьте /usage в официальном CLI",
 "Unsupported agy usage report; expected official quota rows": "Неподдерживаемый отчёт agy; ожидаются штатные строки квот",
 "Unsupported agy quota window": "Неподдерживаемое окно квоты agy",
@@ -394,5 +392,15 @@
 "ais updated to {version} · rr restarts into the new version": "ais обновлён до {version} · rr — перезапуск в новой версии",
 "ais {version} is available · run ais --update": "Доступна ais {version} · выполните ais --update",
 "ais {version} is available, but this copy cannot be replaced ({reason})": "Доступна ais {version}, но эту копию нельзя заменить ({reason})",
-"ais {version} · {target} · checking for updates…": "ais {version} · {target} · проверяю обновления…"
+"ais {version} · {target} · checking for updates…": "ais {version} · {target} · проверяю обновления…",
+"Claude asks whether to trust {dir}: run claude in any project folder once and answer Yes": "Claude спрашивает, доверять ли {dir}: запустите claude один раз в любой папке проекта и ответьте Yes",
+"Claude is not logged in: run claude and type /login": "Claude не авторизован: запустите claude и введите /login",
+"Claude Code not installed": "Claude Code не установлен",
+"Codex CLI not installed": "Codex CLI не установлен",
+"Antigravity CLI not installed": "Antigravity CLI не установлен",
+"reinstall {client} or check that it starts from a terminal": "переустановите {client} или проверьте, что он запускается из терминала",
+"the CLI answered too slowly; press R to retry": "CLI ответил слишком медленно; нажмите R, чтобы повторить",
+"run codex login in a terminal (sign in with ChatGPT), then press R": "выполните codex login в терминале (вход через ChatGPT), затем нажмите R",
+"run claude, type /usage and check that limits show there": "запустите claude, введите /usage и проверьте, что лимиты там видны",
+"open Antigravity and sign in, then press R": "откройте Antigravity и войдите в аккаунт, затем нажмите R"
 }

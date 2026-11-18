@@ -37,7 +37,7 @@ pub fn native_usage_windows(screen: &str) -> Vec<Window> {
     static PERCENT: OnceLock<Regex> = OnceLock::new();
     let header = re(&HEADER, r"Settings\s+Status\s+Config\s+Usage\s+Stats");
     let frames: Vec<&str> = header.split(screen).collect();
-    if frames.len() < 2 || !frames.last().unwrap().contains("Esc to cancel") {
+    if frames.len() < 2 || !has_footer(frames.last().unwrap()) {
         return Vec::new();
     }
     let frame = frames.last().unwrap();
@@ -57,11 +57,24 @@ pub fn native_usage_windows(screen: &str) -> Vec<Window> {
     windows.into_values().collect()
 }
 
+/// The /usage dialog footer: "Esc to cancel" before Claude Code 2.1,
+/// "Esc to close" since.
+const FOOTERS: [&str; 2] = ["Esc to cancel", "Esc to close"];
+
+fn has_footer(text: &str) -> bool {
+    FOOTERS.iter().any(|f| text.contains(f))
+}
+
 fn refreshing(screen: &str) -> bool {
     // screen-reader redraws append changed rows without repeating the header.
-    // A later completed footer supersedes the initial Refreshing marker.
-    let pieces: Vec<&str> = screen.rsplitn(3, "Esc to cancel").collect();
-    let latest = if pieces.len() > 1 { pieces[1] } else { screen };
+    // A later completed footer supersedes the initial Refreshing marker, so
+    // look only at the rows between the last two footers.
+    let mut ends: Vec<(usize, usize)> = FOOTERS.iter().flat_map(|f| screen.match_indices(f).map(|(i, m)| (i, i + m.len()))).collect();
+    ends.sort_unstable();
+    let latest = match ends.as_slice() {
+        [] | [_] => screen,
+        [.., (_, prev_end), (last_start, _)] => &screen[*prev_end..*last_start],
+    };
     latest.contains("Refreshing")
 }
 
@@ -176,12 +189,13 @@ pub fn read_claude_usage(binary: &Path, env: &Env, cwd: &Path, cancel: &Cancel, 
             }
             let screen = clean(&String::from_utf8_lossy(&raw), 0);
             if login.is_match(&screen) {
-                return Err(UsageError::Value(tr(
-                    "Claude CLI cannot see a login in this environment; check claude auth status in the same terminal",
-                )));
+                return Err(UsageError::Value(tr("Claude is not logged in: run claude and type /login")));
             }
             if trust.is_match(&screen) {
-                return Err(UsageError::Value(tr("Claude requires workspace trust; open claude in this directory first")));
+                return Err(UsageError::Value(trf!(
+                    "Claude asks whether to trust {dir}: run claude in any project folder once and answer Yes",
+                    dir = crate::usage::pretty_dir(cwd, &crate::i18n::home())
+                )));
             }
             if !sent && prompt.is_match(&screen) {
                 // The only input ever submitted is a documented built-in UI
@@ -211,6 +225,18 @@ pub fn read_claude_usage(binary: &Path, env: &Env, cwd: &Path, cancel: &Cancel, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn claude_2_1_usage_dialog_with_esc_to_close() {
+        let screen = "you: /usage\nSettings  Status   Config   Usage   Stats\nCurrent session\n0% 0% used\nResets 4:10pm (Europe/Istanbul)\n\
+Current week (all models)\n76% 76% used\nResets Nov 22 at 6am (Europe/Istanbul)\nRefreshing usage…\n←/→ to switch · Esc to close\
+Refreshing usage…\n←/→ to switch · Esc to closeUsage credits\nUsage credits are off\n←/→ to switch · Esc to close";
+        assert!(!refreshing(screen));
+        let windows = native_usage_windows(screen);
+        assert_eq!(windows.len(), 2);
+        assert_eq!(windows[1].used_percent, 76.0);
+        assert!(refreshing("Settings  Status   Config   Usage   Stats\nRefreshing usage…\nEsc to close"));
+    }
 
     #[test]
     fn real_capture_preserves_plan_windows() {
