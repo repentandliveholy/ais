@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ais · AI Sessions</title>
+  <meta name="description" content="All conversations. One entry point. Browse and resume Claude Code, Codex, Gemini, agy, OMP and Pi sessions from one fast terminal app for macOS, Linux and Windows.">
+  <meta name="theme-color" content="#0a0d14">
+  <link rel="canonical" href="https://ais.repentandliveholy.org/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://ais.repentandliveholy.org/">
+  <meta property="og:title" content="ais · AI Sessions">
+  <meta property="og:description" content="All conversations. One entry point. A single native binary for macOS, Linux and Windows.">
+  <meta property="og:image" content="https://ais.repentandliveholy.org/ais-preview.png">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      --bg: #0a0d14;
+      --canvas: radial-gradient(circle at 50% 0%, #171b29 0%, #0a0d14 65%);
+      --card: rgba(18, 24, 38, 0.75);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.18);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --dim: #64748b;
+      --accent: #b9a3ff;
+      --cyan: #73d8f4;
+      --green: #95e1b4;
+      --amber: #f3ca86;
+      --pink: #f291a6;
+      --blue: #95bbff;
+      --gradient: linear-gradient(135deg, #73d8f4 0%, #b9a3ff 50%, #95e1b4 100%);
+      --code-bg: #0d111b;
+      --radius: 16px;
+    }
+    :root[data-theme="light"] {
+      --bg: #f8fafc;
+      --canvas: radial-gradient(circle at 50% 0%, #edf2f7 0%, #f8fafc 70%);
+      --card: rgba(255, 255, 255, 0.9);
+      --border: rgba(0, 0, 0, 0.08);
+      --border-strong: rgba(0, 0, 0, 0.18);
+      --text: #0f172a;
+      --muted: #475569;
+      --dim: #94a3b8;
+      --accent: #6d4fe0;
+      --cyan: #0e7490;
+      --green: #047857;
+      --amber: #b45309;
+      --pink: #be185d;
+      --blue: #1d4ed8;
+      --gradient: linear-gradient(135deg, #0e7490 0%, #6d4fe0 50%, #047857 100%);
+      --code-bg: #0f172a;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) {
+        --bg: #f8fafc;
+        --canvas: radial-gradient(circle at 50% 0%, #edf2f7 0%, #f8fafc 70%);
+        --card: rgba(255, 255, 255, 0.9);
+        --border: rgba(0, 0, 0, 0.08);
+        --border-strong: rgba(0, 0, 0, 0.18);
+        --text: #0f172a;
+        --muted: #475569;
+        --dim: #94a3b8;
+        --accent: #6d4fe0;
+        --cyan: #0e7490;
+        --green: #047857;
+        --amber: #b45309;
+        --pink: #be185d;
+        --blue: #1d4ed8;
+        --gradient: linear-gradient(135deg, #0e7490 0%, #6d4fe0 50%, #047857 100%);
+        --code-bg: #0f172a;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      font: 16px/1.6 var(--font-sans);
+      color: var(--text);
+      background: var(--bg);
+      background-image: var(--canvas);
+      background-attachment: fixed;
+      min-height: 100vh;
+    }
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+    header.top {
+      position: sticky; top: 0; z-index: 10;
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg) 72%, transparent);
+    }
+    .nav { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 12px; }
+    .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 700; letter-spacing: .02em; }
+    .brand img { width: 28px; height: 28px; }
+    .brand small { color: var(--muted); font-weight: 500; }
+    .nav-right { display: flex; align-items: center; gap: 10px; }
+    .lang { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 999px; }
+    .lang button, .icon-btn {
+      font: 600 12px/1 var(--font-sans); color: var(--muted); background: none; border: 0;
+      padding: 7px 10px; border-radius: 999px; cursor: pointer;
+    }
+    .lang button[aria-pressed="true"] { color: var(--text); background: var(--border-strong); }
+    .icon-btn { border: 1px solid var(--border); padding: 7px 9px; }
+    .gh { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-size: 14px; font-weight: 600; }
+    .hero { padding: 72px 0 32px; text-align: center; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid var(--border);
+      border-radius: 999px; color: var(--muted); font-size: 13px; background: var(--card);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); }
+    h1 {
+      font-size: clamp(38px, 7vw, 68px); line-height: 1.05; margin: 22px 0 14px; letter-spacing: -0.03em;
+      background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .lead { max-width: 720px; margin: 0 auto; color: var(--muted); font-size: clamp(17px, 2.2vw, 20px); }
+    .clients { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 26px 0 0; padding: 0; list-style: none; }
+    .clients li { font: 600 13px var(--font-mono); padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); }
+    .install { margin: 40px auto 0; max-width: 760px; text-align: left; }
+    .tabs { display: flex; gap: 6px; margin-bottom: -1px; position: relative; z-index: 1; }
+    .tabs button {
+      font: 600 14px var(--font-sans); color: var(--muted); background: transparent; border: 1px solid transparent;
+      border-bottom: 0; border-radius: 12px 12px 0 0; padding: 10px 16px; cursor: pointer;
+    }
+    .tabs button[aria-selected="true"] { color: #e2e8f0; background: var(--code-bg); border-color: var(--border-strong); }
+    .code {
+      position: relative; background: var(--code-bg); color: #e2e8f0; border: 1px solid var(--border-strong);
+      border-radius: 0 var(--radius) var(--radius) var(--radius); padding: 18px 64px 18px 20px;
+      font: 15px/1.5 var(--font-mono); overflow-x: auto; white-space: nowrap;
+    }
+    .code .prompt { color: #64748b; user-select: none; margin-right: 10px; }
+    .copy {
+      position: absolute; top: 50%; right: 12px; transform: translateY(-50%);
+      font: 600 12px var(--font-sans); color: #cbd5e1; background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.14); border-radius: 8px; padding: 6px 10px; cursor: pointer;
+    }
+    .copy:hover { background: rgba(255,255,255,.16); }
+    .note { color: var(--dim); font-size: 14px; margin: 12px 4px 0; }
+    .shot { margin: 56px auto 0; max-width: 1000px; }
+    .shot img {
+      width: 100%; height: auto; display: block; border-radius: 18px; border: 1px solid var(--border-strong);
+      box-shadow: 0 30px 80px -30px rgba(0,0,0,.7), 0 0 60px rgba(185,163,255,.12);
+    }
+    section { padding: 64px 0 0; }
+    h2 { font-size: clamp(26px, 4vw, 36px); letter-spacing: -0.02em; margin: 0 0 8px; }
+    .sub { color: var(--muted); margin: 0 0 28px; max-width: 720px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; }
+    .card h3 { margin: 0 0 6px; font-size: 17px; }
+    .card p { margin: 0; color: var(--muted); font-size: 15px; }
+    .card .ico { font: 700 18px var(--font-mono); margin-bottom: 10px; display: block; }
+    .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 6px 22px; }
+    .keys div { display: flex; gap: 12px; align-items: baseline; padding: 7px 0; border-bottom: 1px dashed var(--border); font-size: 15px; }
+    kbd {
+      font: 600 12px var(--font-mono); padding: 3px 7px; border-radius: 6px; border: 1px solid var(--border-strong);
+      background: var(--card); min-width: 64px; text-align: center; white-space: nowrap;
+    }
+    .keys span { color: var(--muted); }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; }
+    .split img { width: 100%; border-radius: 14px; border: 1px solid var(--border-strong); }
+    .platforms { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+    .platforms a { display: block; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); }
+    .platforms a:hover { border-color: var(--border-strong); text-decoration: none; }
+    .platforms small { display: block; color: var(--dim); font: 12px var(--font-mono); margin-top: 3px; }
+    footer { margin: 80px 0 0; padding: 28px 0 40px; border-top: 1px solid var(--border); color: var(--dim); font-size: 14px; }
+    footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+    #version { font-family: var(--font-mono); }
+    @media (max-width: 760px) {
+      .split { grid-template-columns: 1fr; }
+      .hero { padding-top: 44px; }
+      .gh span { display: none; }
+      .code { font-size: 13px; padding-right: 72px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap nav">
+      <a class="brand" href="/"><img src="favicon.svg" alt=""> ais <small>· AI Sessions</small></a>
+      <div class="nav-right">
+        <div class="lang" role="group" aria-label="Language">
+          <button type="button" data-lang="en">EN</button>
+          <button type="button" data-lang="ru">RU</button>
+          <button type="button" data-lang="fr">FR</button>
+        </div>
+        <button class="icon-btn" type="button" id="theme" aria-label="Theme">◐</button>
+        <a class="gh" href="https://github.com/repentandliveholy/ais">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          <span>GitHub</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="hero">
+      <span class="badge"><span class="dot"></span><span data-i18n="badge">Native binary · macOS · Linux · Windows</span> <span id="version"></span></span>
+      <h1 data-i18n="title">All conversations.<br>One entry point.</h1>
+      <p class="lead" data-i18n="lead">ais finds every saved session of your AI coding CLIs, shows them by project with status, model and last message, and resumes any of them in its own client and folder — in one keystroke.</p>
+      <ul class="clients">
+        <li style="color:var(--amber)">Claude Code</li>
+        <li style="color:var(--blue)">Codex</li>
+        <li style="color:var(--cyan)">Gemini CLI</li>
+        <li style="color:var(--accent)">agy</li>
+        <li style="color:var(--green)">OMP</li>
+        <li style="color:var(--pink)">Pi</li>
+      </ul>
+
+      <div class="install">
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" data-os="unix" aria-selected="true">macOS · Linux</button>
+          <button type="button" role="tab" data-os="win" aria-selected="false">Windows</button>
+        </div>
+        <div class="code"><span class="prompt" id="prompt">$</span><span id="cmd">curl -fsSL https://ais.repentandliveholy.org/install.sh | sh</span>
+          <button class="copy" type="button" id="copy" data-i18n="copy">Copy</button>
+        </div>
+        <p class="note" data-i18n="note">Picks the build for your OS and CPU, verifies its SHA-256 and installs to ~/.local/bin. Then just run <code>ais</code>.</p>
+      </div>
+    </div>
+
+    <div class="shot"><img src="ais-preview.png" width="1336" height="920" alt="ais session browser (demo data)" loading="lazy"></div>
+
+    <section>
+      <h2 data-i18n="featuresTitle">Everything you said to an AI, one keystroke away</h2>
+      <p class="sub" data-i18n="featuresSub">Read-only, local, fast. ais never edits client history and never sends it anywhere.</p>
+      <div class="grid">
+        <div class="card"><span class="ico" style="color:var(--green)">▸ ▾</span><h3 data-i18n="f1t">Projects first</h3><p data-i18n="f1d">Folders with sessions ordered by last activity, as a flat list or a nested tree. Enter drills in; Backspace goes back.</p></div>
+        <div class="card"><span class="ico" style="color:var(--amber)">↩</span><h3 data-i18n="f2t">Resume where it was</h3><p data-i18n="f2d">Enter starts the original CLI with its native resume flag in the session's own directory, then returns you to the list.</p></div>
+        <div class="card"><span class="ico" style="color:var(--cyan)">⌕</span><h3 data-i18n="f3t">Search that understands you</h3><p data-i18n="f3d">Words, -exclusions and filters: client:, model:, status:, branch:, dir:, since:3d, is:pinned — with highlighted matches.</p></div>
+        <div class="card"><span class="ico" style="color:var(--accent)">▰▱</span><h3 data-i18n="f4t">5h and weekly limits</h3><p data-i18n="f4d">Usage per account from the official CLIs — Claude, Codex, agy — with reset times and a pace forecast. Plus DeepSeek balance.</p></div>
+        <div class="card"><span class="ico" style="color:var(--blue)">⟳</span><h3 data-i18n="f5t">Updates itself, safely</h3><p data-i18n="f5d">Once a day ais checks an Ed25519-signed release manifest and swaps in the new binary only after its SHA-256 matches.</p></div>
+        <div class="card"><span class="ico" style="color:var(--pink)">◆</span><h3 data-i18n="f6t">One small binary</h3><p data-i18n="f6d">Rust, ~6 MB, no runtime. macOS (Apple Silicon, Intel), static Linux (x86_64, arm64) and Windows x64. English, Russian, French.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="split">
+        <div>
+          <h2 data-i18n="usageTitle">Know your limits before they hit</h2>
+          <p class="sub" data-i18n="usageSub">Press U. Every signed-in account gets its own block: plan, config dirs, local activity, used and remaining for each window, when it resets, and whether the current pace will run out first. Two Claude logins stay two blocks; one login in two folders is shown once.</p>
+        </div>
+        <img src="ais-usage.png" width="1336" height="1280" alt="ais usage panel (demo data)" loading="lazy">
+      </div>
+    </section>
+
+    <section>
+      <h2 data-i18n="keysTitle">Keys</h2>
+      <div class="keys">
+        <div><kbd>↑↓ j k</kbd><span data-i18n="k1">select</span></div>
+        <div><kbd>Enter</kbd><span data-i18n="k2">open folder · resume</span></div>
+        <div><kbd>/</kbd><span data-i18n="k3">search</span></div>
+        <div><kbd>Tab</kbd><span data-i18n="k4">current directory / all</span></div>
+        <div><kbd>← → 0–6</kbd><span data-i18n="k5">filter by client</span></div>
+        <div><kbd>N</kbd><span data-i18n="k6">new session</span></div>
+        <div><kbd>F</kbd><span data-i18n="k7">pin</span></div>
+        <div><kbd>y Y</kbd><span data-i18n="k8">copy command / ID</span></div>
+        <div><kbd>P S U</kbd><span data-i18n="k9">projects · sessions · usage</span></div>
+        <div><kbd>T</kbd><span data-i18n="k10">project tree</span></div>
+        <div><kbd>L</kbd><span data-i18n="k11">language</span></div>
+        <div><kbd>?</kbd><span data-i18n="k12">all keys</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 data-i18n="dlTitle">Downloads</h2>
+      <p class="sub" data-i18n="dlSub">Prefer a manual install? Grab the binary for your platform from the latest release, or build it with cargo install --path ais-cli.</p>
+      <div class="platforms">
+        <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-aarch64-apple-darwin">macOS · Apple Silicon<small>ais-aarch64-apple-darwin</small></a>
+        <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-x86_64-apple-darwin">macOS · Intel<small>ais-x86_64-apple-darwin</small></a>
+        <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-x86_64-unknown-linux-musl">Linux · x86_64<small>ais-x86_64-unknown-linux-musl</small></a>
+        <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-aarch64-unknown-linux-musl">Linux · arm64<small>ais-aarch64-unknown-linux-musl</small></a>
+        <a href="https://github.com/repentandliveholy/ais/releases/latest/download/ais-x86_64-pc-windows-gnu.exe">Windows · x64<small>ais-x86_64-pc-windows-gnu.exe</small></a>
+        <a href="https://github.com/repentandliveholy/ais/releases/latest">SHA256SUMS · <span data-i18n="notes">release notes</span><small>github.com/…/releases</small></a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>ais · AI Sessions · MIT · <a href="https://repentandliveholy.org">repentandliveholy.org</a></span>
+      <span><a href="https://github.com/repentandliveholy/ais" data-i18n="source">Source code</a> · <a href="releases/latest.json">latest.json</a></span>
+    </div>
+  </footer>
+
+  <script>
+    const I18N = {
+      en: {},
+      ru: {
+        badge: "Нативный бинарник · macOS · Linux · Windows",
+        title: "Все диалоги.<br>Один вход.",
+        lead: "ais находит все сохранённые сессии ваших AI-CLI, показывает их по проектам со статусом, моделью и последним сообщением и продолжает любую из них в своём клиенте и каталоге — одной клавишей.",
+        copy: "Копировать", copied: "Скопировано",
+        note: "Выберет сборку под вашу ОС и процессор, сверит SHA-256 и поставит в ~/.local/bin. Дальше просто <code>ais</code>.",
+        noteWin: "Поставит ais.exe в %LOCALAPPDATA%\\ais\\bin, сверит SHA-256 и добавит папку в PATH. Дальше просто <code>ais</code>.",
+        featuresTitle: "Всё, что вы говорили ИИ, — в одном нажатии",
+        featuresSub: "Только чтение, локально, быстро. ais не меняет историю клиентов и никуда её не отправляет.",
+        f1t: "Сначала проекты", f1d: "Папки с сессиями по последней активности — списком или деревом. Enter — внутрь, Backspace — назад.",
+        f2t: "Продолжить там, где было", f2d: "Enter запускает исходный CLI с его родным флагом возобновления в каталоге сессии, а после выхода возвращает к списку.",
+        f3t: "Поиск, который понимает", f3d: "Слова, -исключения и фильтры: client:, model:, status:, branch:, dir:, since:3d, is:pinned — с подсветкой совпадений.",
+        f4t: "Лимиты 5ч и неделя", f4d: "Расход по каждому аккаунту из официальных CLI — Claude, Codex, agy — со временем сброса и прогнозом темпа. Плюс баланс DeepSeek.",
+        f5t: "Обновляется сам и безопасно", f5d: "Раз в сутки ais проверяет манифест релиза с подписью Ed25519 и ставит новый бинарник только при совпадении SHA-256.",
+        f6t: "Один маленький бинарник", f6d: "Rust, ~6 МБ, без рантайма. macOS (Apple Silicon, Intel), статический Linux (x86_64, arm64) и Windows x64. Английский, русский, французский.",
+        usageTitle: "Знайте лимиты заранее",
+        usageSub: "Нажмите U. У каждого аккаунта свой блок: тариф, каталоги конфигурации, локальная активность, расход по каждому окну, время сброса и прогноз, хватит ли лимита. Два входа в Claude — два блока; один вход в двух папках — один блок.",
+        keysTitle: "Клавиши",
+        k1: "выбор", k2: "войти в папку · продолжить", k3: "поиск", k4: "текущий каталог / все", k5: "фильтр по клиенту",
+        k6: "новая сессия", k7: "закрепить", k8: "копировать команду / ID", k9: "проекты · сессии · лимиты", k10: "дерево проектов", k11: "язык", k12: "все клавиши",
+        dlTitle: "Загрузки", dlSub: "Хотите вручную? Возьмите бинарник для своей платформы из последнего релиза или соберите через cargo install --path ais-cli.",
+        notes: "описание релиза", source: "Исходный код"
+      },
+      fr: {
+        badge: "Binaire natif · macOS · Linux · Windows",
+        title: "Toutes les conversations.<br>Un seul point d’entrée.",
+        lead: "ais retrouve chaque session enregistrée de vos CLI d’IA, les classe par projet avec statut, modèle et dernier message, et reprend n’importe laquelle dans son client et son dossier — en une touche.",
+        copy: "Copier", copied: "Copié",
+        note: "Choisit la version pour votre OS et votre processeur, vérifie son SHA-256 et l’installe dans ~/.local/bin. Ensuite, lancez simplement <code>ais</code>.",
+        noteWin: "Installe ais.exe dans %LOCALAPPDATA%\\ais\\bin, vérifie son SHA-256 et ajoute le dossier au PATH. Ensuite, lancez simplement <code>ais</code>.",
+        featuresTitle: "Tout ce que vous avez dit à une IA, à une touche",
+        featuresSub: "Lecture seule, locale, rapide. ais ne modifie jamais l’historique des clients et ne l’envoie nulle part.",
+        f1t: "Les projets d’abord", f1d: "Les dossiers avec sessions, par dernière activité, en liste ou en arborescence. Entrée pour entrer, Retour arrière pour revenir.",
+        f2t: "Reprendre là où c’était", f2d: "Entrée lance le CLI d’origine avec son option de reprise native dans le dossier de la session, puis vous ramène à la liste.",
+        f3t: "Une recherche qui comprend", f3d: "Mots, -exclusions et filtres : client:, model:, status:, branch:, dir:, since:3d, is:pinned — avec surlignage.",
+        f4t: "Limites 5 h et hebdo", f4d: "L’usage de chaque compte via les CLI officiels — Claude, Codex, agy — avec l’heure de réinitialisation et une prévision de rythme. Et le solde DeepSeek.",
+        f5t: "Mise à jour automatique et sûre", f5d: "Une fois par jour, ais vérifie un manifeste signé Ed25519 et n’installe le nouveau binaire que si son SHA-256 correspond.",
+        f6t: "Un seul petit binaire", f6d: "Rust, ~6 Mo, sans runtime. macOS (Apple Silicon, Intel), Linux statique (x86_64, arm64) et Windows x64. Anglais, russe, français.",
+        usageTitle: "Connaître ses limites avant de les atteindre",
+        usageSub: "Appuyez sur U. Chaque compte connecté a son bloc : offre, dossiers de configuration, activité locale, usage par fenêtre, réinitialisation et prévision. Deux connexions Claude restent deux blocs ; une connexion dans deux dossiers n’apparaît qu’une fois.",
+        keysTitle: "Touches",
+        k1: "sélection", k2: "ouvrir le dossier · reprendre", k3: "recherche", k4: "dossier courant / tous", k5: "filtrer par client",
+        k6: "nouvelle session", k7: "épingler", k8: "copier la commande / l’ID", k9: "projets · sessions · usage", k10: "arborescence", k11: "langue", k12: "toutes les touches",
+        dlTitle: "Téléchargements", dlSub: "Installation manuelle ? Prenez le binaire de votre plateforme dans la dernière version, ou compilez avec cargo install --path ais-cli.",
+        notes: "notes de version", source: "Code source"
+      }
+    };
+    const COMMANDS = {
+      unix: { prompt: "$", cmd: "curl -fsSL https://ais.repentandliveholy.org/install.sh | sh" },
+      win: { prompt: "PS>", cmd: "irm https://ais.repentandliveholy.org/install.ps1 | iex" }
+    };
+    const english = {};
+    document.querySelectorAll("[data-i18n]").forEach(el => { english[el.dataset.i18n] = el.innerHTML; });
+    english.copied = "Copied";
+    english.noteWin = "Installs ais.exe to %LOCALAPPDATA%\\ais\\bin, verifies its SHA-256 and adds the folder to PATH. Then just run <code>ais</code>.";
+    let lang = "en", os = /Win/.test(navigator.platform) ? "win" : "unix";
+    const t = key => (I18N[lang] && I18N[lang][key]) || english[key];
+    function store(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
+    function recall(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+    function applyLang(next) {
+      lang = I18N[next] ? next : "en";
+      document.documentElement.lang = lang;
+      document.querySelectorAll("[data-i18n]").forEach(el => { el.innerHTML = t(el.dataset.i18n); });
+      document.querySelectorAll(".lang button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+      applyOs(os);
+      store("ais-lang", lang);
+    }
+    function applyOs(next) {
+      os = next;
+      document.getElementById("prompt").textContent = COMMANDS[os].prompt;
+      document.getElementById("cmd").textContent = COMMANDS[os].cmd;
+      document.querySelector(".note").innerHTML = os === "win" ? t("noteWin") : t("note");
+      document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.os === os)));
+    }
+    document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => applyLang(b.dataset.lang)));
+    document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => applyOs(b.dataset.os)));
+    document.getElementById("copy").addEventListener("click", async e => {
+      try { await navigator.clipboard.writeText(COMMANDS[os].cmd); } catch (err) {}
+      e.target.textContent = t("copied");
+      setTimeout(() => { e.target.textContent = t("copy"); }, 1500);
+    });
+    document.getElementById("theme").addEventListener("click", () => {
+      const root = document.documentElement;
+      const dark = root.dataset.theme ? root.dataset.theme === "dark" : !matchMedia("(prefers-color-scheme: light)").matches;
+      root.dataset.theme = dark ? "light" : "dark";
+      store("ais-theme", root.dataset.theme);
+    });
+    const savedTheme = recall("ais-theme");
+    if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+    const wanted = new URLSearchParams(location.search).get("lang") || recall("ais-lang") ||
+      ((navigator.language || "en").slice(0, 2));
+    applyLang(wanted);
+    fetch("releases/latest.json").then(r => r.ok ? r.json() : null).then(m => {
+      if (m && m.version) document.getElementById("version").textContent = "· v" + m.version;
+    }).catch(() => {});
+  </script>
+</body>
+</html>

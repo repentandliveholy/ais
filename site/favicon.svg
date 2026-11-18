@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">ais · AI Sessions</title>
+  <desc id="desc">Three session paths converge into a single launch point.</desc>
+  <defs>
+    <linearGradient id="flow" x1="100" y1="120" x2="400" y2="400" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#73d8f4"/>
+      <stop offset=".52" stop-color="#b9a3ff"/>
+      <stop offset="1" stop-color="#95e1b4"/>
+    </linearGradient>
+    <radialGradient id="halo">
+      <stop stop-color="#b9a3ff" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#11151f" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#11151f"/>
+  <circle cx="256" cy="256" r="226" fill="url(#halo)"/>
+  <!-- Distinct conversations join the same launch point. -->
+  <g fill="none" stroke="url(#flow)" stroke-width="25" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M131 350V212c0-60 45-108 101-108s101 48 101 108v138"/>
+    <path d="M131 273h202"/>
+    <path d="M381 161v112c0 59-48 107-107 107H171"/>
+  </g>
+  <circle cx="131" cy="350" r="13" fill="#73d8f4"/>
+  <circle cx="381" cy="161" r="13" fill="#95e1b4"/>
+  <circle cx="256" cy="273" r="27" fill="#11151f"/>
+  <path d="m249 258 22 15-22 15z" fill="#edf1f8"/>
+</svg>

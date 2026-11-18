@@ -6,14 +6,46 @@ English · [Русский](README.ru.md)
 
 ![Session browser with demo data](artifacts/ais-preview.png)
 
-## Run
+## Install
 
-Requires Python 3.10+ with `curses`, on macOS or Linux. No external Python dependencies.
+ais is a single native binary (Rust) for **macOS, Linux and Windows**. No runtime, no dependencies.
+
+**macOS / Linux**
 
 ```sh
-git clone https://github.com/repentandliveholy/ais.git
-cd ais
-./ais
+curl -fsSL https://ais.repentandliveholy.org/install.sh | sh
+```
+
+**Windows (PowerShell)**
+
+```powershell
+irm https://ais.repentandliveholy.org/install.ps1 | iex
+```
+
+Mirror without the website: `curl -fsSL https://github.com/repentandliveholy/ais/releases/latest/download/install.sh | sh`.
+
+The installer picks the build for your OS and CPU (Apple Silicon / Intel, Linux x86_64 / arm64 static musl, Windows x64), checks its SHA-256 against the release `SHA256SUMS`, and installs to `~/.local/bin` (`%LOCALAPPDATA%\ais\bin` on Windows). Binaries are also attached to every [GitHub release](https://github.com/repentandliveholy/ais/releases). From source: `cargo install --path ais-cli`.
+
+### Updates
+
+ais updates itself. Once a day, while the browser is open, it fetches the release manifest from `ais.repentandliveholy.org` (falling back to the GitHub release), verifies its **Ed25519 signature** with the key compiled into the binary, downloads the build for your platform, checks its SHA-256 and atomically replaces the executable. The footer then says `ais updated to X · rr restarts into the new version`. Nothing is installed unless both the signature and the checksum match.
+
+```sh
+ais --update            # check and install now
+ais --no-update-check   # skip the background check for this run
+AIS_NO_UPDATE=1 ais     # disable it via the environment
+```
+
+Or set `"auto_update": false` in `~/.config/ai-sessions/settings.json`. Copies run from a cargo `target/` directory or from a read-only location are never replaced; ais just tells you a new version is available.
+
+### Python edition
+
+The original implementation is kept in [`ai_sessions/`](ai_sessions/) as an optional edition with the same interface (Python 3.10+, macOS/Linux, no dependencies): run `./ais` from a checkout or `pip install .`, which installs it as `ais-py`. The Rust binary is the default and the one that is released and auto-updated.
+
+## Run
+
+```sh
+ais
 ```
 
 The launcher works from any directory. It opens on **Projects**, a flat list of folders with saved sessions. `T` switches to a nested project tree. Press `S` for the **current-directory** session list; `Tab` opens Sessions and switches between current directory and all projects. Sessions always launch in their **own directories**.
@@ -21,15 +53,6 @@ The launcher works from any directory. It opens on **Projects**, a flat list of 
 After `/exit` or another CLI exit, ais automatically returns to the browser and reloads history. Search, filters and selection are preserved. Exit codes and signals appear in the footer. A `Ctrl+C` that interrupts a response inside the CLI does not close the waiting launcher.
 
 Use `ais --no-return` for direct execution without returning. Interactive `--new` and `--resume` also return to the browser by default; scripts without a TTY launch once.
-
-To add a short command to your PATH:
-
-```sh
-mkdir -p ~/.local/bin
-ln -s "$PWD/ais" ~/.local/bin/ais
-```
-
-This does not overwrite an existing file. Alternatively, install with `pip install .` in your environment.
 
 **Desktop app:** [`ais-shell/`](ais-shell/README.md) is a native window for the same histories: live per-CLI agent status (working / waiting / needs you / error), a 5h/week usage panel, one-click resume, a real terminal (alacritty engine, kitty keys, mouse, bracketed paste) with split panes, and a ⌘P command palette. `./ais-shell/bundle.sh --install` builds `ais.app`.
 
@@ -113,9 +136,9 @@ On wide terminals, details appear on the right. Projects and Sessions use the sa
 
 History refreshes automatically every **10 seconds** while Projects or Sessions is open. Usage refreshes every **60 seconds** while its panel is open. Intervals start after the previous refresh finishes; requests do not overlap. Search, filters and the selected session are preserved. Use `ais --no-auto-refresh` to disable periodic refresh; `R` still works. With `--cached-usage`, Usage refreshes local snapshots only.
 
-Wheel input is handled explicitly, including older macOS ncurses. Queued wheel reports are drained before a move; only the latest direction is used, without replaying old motion. Continuous scrolling moves one session card or one Usage/detail line at most every 40 ms. Ignored reports do not delay the next step or create motion to replay after input stops. Reversing direction moves immediately, including at either edge. Keyboard input is preserved. Scrolling clamps to the actual content after a resize or data refresh. Alternate-screen arrow emulation is temporarily disabled and restored on exit.
+Wheel input is handled explicitly. Queued wheel reports are drained before a move; only the latest direction is used, without replaying old motion. Continuous scrolling moves one session card or one Usage/detail line at most every 40 ms. Ignored reports do not delay the next step or create motion to replay after input stops. Reversing direction moves immediately, including at either edge. Keyboard input is preserved. Scrolling clamps to the actual content after a resize or data refresh. Alternate-screen arrow emulation is temporarily disabled and restored on exit.
 
-SGR mouse reporting stays enabled on older macOS ncurses too: ais decodes those reports directly, since Warp otherwise converts scrolling into arrow keys. Until the terminal supplies its first mouse report, repeated Up/Down input uses the same 40 ms speed limit. Page Up/Down and Home/End remain available for larger jumps.
+ais enables SGR mouse reporting (press and wheel only, no motion tracking) and decodes those reports directly, since Warp otherwise converts scrolling into arrow keys. Until the terminal supplies its first mouse report, repeated Up/Down input uses the same 40 ms speed limit. Page Up/Down and Home/End remain available for larger jumps.
 
 ## Session information
 
@@ -158,25 +181,25 @@ The interfaces were checked against [Codex App Server](https://developers.openai
 ## Command examples
 
 ```sh
-./ais --all
-./ais --sessions
-./ais -C ~/Dev/mesh --client omp
-./ais --all --query "authentication"
-./ais --lang en
-./ais --usage
-./ais --usage --json
-./ais --usage --cached-usage
-./ais --all --json
-./ais --doctor
-./ais --last                        # resume the newest session in this directory
-./ais --last --client claude --print-command
-./ais --all --list -q "since:2d -status:error" -n 20
-./ais --stats                       # clients, top projects, models, statuses, activity
-./ais --stats --json
-./ais --resume SESSION_ID --print-command
-./ais --resume SESSION_ID --client claude
-./ais --new codex
-./ais --no-return
+ais --all
+ais --sessions
+ais -C ~/Dev/mesh --client omp
+ais --all --query "authentication"
+ais --lang en
+ais --usage
+ais --usage --json
+ais --usage --cached-usage
+ais --all --json
+ais --doctor
+ais --last                        # resume the newest session in this directory
+ais --last --client claude --print-command
+ais --all --list -q "since:2d -status:error" -n 20
+ais --stats                       # clients, top projects, models, statuses, activity
+ais --stats --json
+ais --resume SESSION_ID --print-command
+ais --resume SESSION_ID --client claude
+ais --new codex
+ais --no-return
 ```
 
 Terminal modes are restored before launching a client. ais passes an argument array without a shell and uses the client's real stdin/stdout/stderr, with no intermediate PTY. The child runs in the session's directory; the parent keeps its original working directory.
@@ -195,7 +218,7 @@ Terminal modes are restored before launching a client. ais passes an argument ar
 `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, `PI_CODING_AGENT_DIR` and `PI_CODING_AGENT_SESSION_DIR` are supported. Override sources explicitly with:
 
 ```sh
-./ais --source omp=/path/to/agent --source codex=/path/to/codex-home
+ais --source omp=/path/to/agent --source codex=/path/to/codex-home
 ```
 
 Gemini history remains visible if the original project directory cannot be resolved, but resume is disabled. Custom agy and Gemini stores support browsing only, since no resume argument for selecting those stores has been confirmed. Missing clients/directories and ambiguous IDs prevent launch; ais does not install clients.
@@ -209,8 +232,8 @@ The ais index is stored in `${XDG_CACHE_HOME:-~/.cache}/ai-sessions` with `600` 
 Large JSONL files are initially sampled from the start and end; sampled counters use `≥`. Full details load in the background for the selected session. Unchanged files reuse the index.
 
 ```sh
-./ais --no-cache
-./ais --cache-dir .ais-cache
+ais --no-cache
+ais --cache-dir .ais-cache
 ```
 
 Screenshots in `artifacts/` contain **demo data** only.
@@ -218,9 +241,15 @@ Screenshots in `artifacts/` contain **demo data** only.
 ## Development
 
 ```sh
-python3 -m unittest discover -s tests -v
-./ais --demo --snapshot artifacts/ais-preview.svg --cols 144 --rows 44
-./ais --demo --usage --snapshot artifacts/ais-usage.svg --cols 144 --rows 44
+cd ais-cli
+cargo test                      # unit tests: adapters, cache, queries, usage parsers, rendering, updater
+cargo clippy --all-targets -- -D warnings
+cargo run -- --demo --snapshot ../artifacts/ais-preview.svg --cols 144 --rows 44
+cargo run -- --demo --usage --snapshot ../artifacts/ais-usage.svg --cols 144 --rows 44
 ```
 
-Tests cover adapters, partial JSONL, WAL, directory selection, caching, usage parsing, project trees and ambiguous IDs. Real PTY tests cover the default Projects view, folder drill-down, Backspace navigation, colors, search, resize, Usage, language selection and persistence, wheel bursts, exact launch arguments and restoration of `ECHO` / `ICANON`.
+The Rust edition reproduces the Python edition screen for screen: demo snapshots in all three languages and many terminal sizes, `--json`, `--list`, `--doctor` and `--usage` output are compared byte for byte against `./ais`. The Python test suite still runs with `python3 -m unittest discover -s tests -v`.
+
+### Releases
+
+Bump `version` in `ais-cli/Cargo.toml` and push a tag `vX.Y.Z`. The [release workflow](.github/workflows/ais-release.yml) builds macOS (arm64, x86_64), Linux (x86_64, arm64, static musl) and Windows (x64) binaries, writes `latest.json` with their SHA-256, signs it with the `AIS_SIGNING_KEY` secret (`cargo run --example release_sign`) and publishes everything plus `install.sh` / `install.ps1` as a GitHub release. The website serves the same signed manifest.

@@ -82,6 +82,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# Bundle the native `ais` indexer so the app needs no Python or PATH setup.
+if [ -f ../ais-cli/Cargo.toml ]; then
+  (cd ../ais-cli && cargo build --release)
+  cp ../ais-cli/target/release/ais "$APP/Contents/Resources/ais"
+fi
+
 IDENTITY="${CODESIGN_IDENTITY:--}"
 codesign --force --sign "$IDENTITY" "$APP" >/dev/null 2>&1 || true
 echo "Built $APP (macOS >= ${MACOSX_DEPLOYMENT_TARGET})"

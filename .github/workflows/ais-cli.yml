@@ -1,14 +1,18 @@
-name: ais CLI
+name: ais (Python edition)
 
 on:
   push:
-    paths-ignore:
-      - "ais-shell/**"
-      - ".github/workflows/ais-shell.yml"
+    paths:
+      - "ai_sessions/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - ".github/workflows/ais-cli.yml"
   pull_request:
-    paths-ignore:
-      - "ais-shell/**"
-      - ".github/workflows/ais-shell.yml"
+    paths:
+      - "ai_sessions/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - ".github/workflows/ais-cli.yml"
 
 jobs:
   test:

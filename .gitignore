@@ -12,3 +12,5 @@ ais-shell/dist/
 /warp/
 /CACHE-PANEL.md
 /target/
+ais-cli/target/
+ais-cli/dist/

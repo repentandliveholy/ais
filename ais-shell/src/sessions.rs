@@ -191,7 +191,7 @@ pub fn truncate(text: &str, max: usize) -> String {
     out
 }
 
-/// Locates the Python `ais` launcher: `$AIS_BIN`, then `PATH`, then beside the
+/// Locates the `ais` CLI: `$AIS_BIN`, then `PATH`, then beside the
 /// executable (or bundle Resources), and in debug builds the sibling repo copy.
 pub fn find_ais() -> Option<PathBuf> {
     if let Some(path) = env::var_os("AIS_BIN").map(PathBuf::from)

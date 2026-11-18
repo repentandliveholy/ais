@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 dependencies = []
 
 [project.scripts]
-ais = "ai_sessions.cli:entrypoint"
+ais-py = "ai_sessions.cli:entrypoint"
 
 [tool.setuptools.packages.find]
 include = ["ai_sessions*"]
