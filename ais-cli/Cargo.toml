@@ -1,6 +1,6 @@
 [package]
 name = "ais"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 rust-version = "1.89"
 description = "ais · AI Sessions — browse local AI CLI history (Claude Code, Codex, Gemini, agy, OMP, Pi) and resume any session"
