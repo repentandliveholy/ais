@@ -425,7 +425,11 @@ mod tests {
     #[test]
     fn quoting_splitting_and_urls() {
         assert_eq!(shell_quote("/tmp/a.png"), "/tmp/a.png");
-        assert_eq!(shell_quote("/tmp/my file.png"), "'/tmp/my file.png'");
+        if cfg!(windows) {
+            assert_eq!(shell_quote("/tmp/my file.png"), "\"/tmp/my file.png\"");
+        } else {
+            assert_eq!(shell_quote("/tmp/my file.png"), "'/tmp/my file.png'");
+        }
         assert_eq!(mention_quote("src/app.rs"), "@src/app.rs");
         assert_eq!(mention_quote("my docs/plan final.md"), "@\"my docs/plan final.md\"");
         assert_eq!(

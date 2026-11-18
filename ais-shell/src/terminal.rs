@@ -981,12 +981,13 @@ fn apply_child_env(command: &mut CommandBuilder) {
 mod tests {
     use super::*;
 
+    #[cfg_attr(not(unix), allow(dead_code))]
     fn spec(program: &str, args: &[&str]) -> LaunchSpec {
         LaunchSpec {
             client: CliKind::Shell,
             program: program.to_string(),
             args: args.iter().map(|arg| arg.to_string()).collect(),
-            cwd: PathBuf::from("/tmp"),
+            cwd: std::env::temp_dir(),
             label: "test".to_string(),
         }
     }
@@ -1014,6 +1015,16 @@ mod tests {
         panic!("PTY did not show {needle:?}; screen was {:?}", screen_text(pane));
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn windows_conpty_round_trip() {
+        let mut pane = TerminalPane::empty();
+        pane.launch(spec("cmd.exe", &["/C", "echo AIS_WIN_PTY_OK"]))
+            .expect("spawn cmd.exe in ConPTY");
+        wait_for(&mut pane, "AIS_WIN_PTY_OK");
+    }
+
+    #[cfg(unix)]
     #[test]
     fn pty_round_trip_selection_and_exit_status() {
         let mut pane = TerminalPane::empty();
@@ -1040,6 +1051,7 @@ mod tests {
         assert_eq!(exit.expect("child should exit").code, 0);
     }
 
+    #[cfg(unix)]
     #[test]
     fn child_env_sets_colorterm() {
         let mut pane = TerminalPane::empty();
@@ -1057,6 +1069,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn answers_cursor_position_query() {
         let mut pane = TerminalPane::empty();
@@ -1071,6 +1084,7 @@ mod tests {
         wait_for(&mut pane, "REPLY:033[1;3R");
     }
 
+    #[cfg(unix)]
     #[test]
     fn shell_runs_commands_and_bracketed_paste() {
         let mut pane = TerminalPane::empty();
@@ -1089,6 +1103,7 @@ mod tests {
         wait_for(&mut pane, "PASTE:033[200~x033[201~");
     }
 
+    #[cfg(unix)]
     #[test]
     fn scrollback_moves_and_returns_to_bottom() {
         let mut pane = TerminalPane::empty();
@@ -1110,6 +1125,7 @@ mod tests {
         assert_eq!(pane.scroll_state().0, 0);
     }
 
+    #[cfg(unix)]
     #[test]
     fn restart_relaunches_same_program() {
         let mut pane = TerminalPane::empty();

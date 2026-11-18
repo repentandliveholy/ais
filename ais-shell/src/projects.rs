@@ -805,7 +805,7 @@ mod tests {
         .unwrap();
         let scan = scan_projects(&home);
         assert_eq!(scan.projects.len(), 1);
-        assert_eq!(scan.projects[0].path, fs::canonicalize(&real_project).unwrap());
+        assert_eq!(scan.projects[0].path, canonical_path(&real_project));
         assert_eq!(scan.projects[0].last_title.as_deref(), Some("Real title"));
         let _ = fs::remove_dir_all(root);
     }
@@ -846,14 +846,14 @@ mod tests {
         let one = scan
             .projects
             .iter()
-            .find(|project| project.path == fs::canonicalize(&first).unwrap())
+            .find(|project| project.path == canonical_path(&first))
             .expect("OMP project");
         assert_eq!(one.sessions, 1);
         assert_eq!(one.clients.get(&CliKind::Omp), Some(&1));
         let two = scan
             .projects
             .iter()
-            .find(|project| project.path == fs::canonicalize(&second).unwrap())
+            .find(|project| project.path == canonical_path(&second))
             .expect("Claude project");
         assert_eq!(two.clients.get(&CliKind::Claude), Some(&1));
         assert_eq!(
@@ -906,7 +906,7 @@ mod tests {
         let project = scan
             .projects
             .iter()
-            .find(|project| project.path == fs::canonicalize(&workspace).unwrap())
+            .find(|project| project.path == canonical_path(&workspace))
             .expect("agy project");
         assert_eq!(project.clients.get(&CliKind::Agy), Some(&1));
         let snapshot = scan.latest.get(&CliKind::Agy).expect("agy snapshot");
@@ -948,7 +948,7 @@ mod tests {
         let project = scan
             .projects
             .iter()
-            .find(|project| project.path == fs::canonicalize(&workspace).unwrap())
+            .find(|project| project.path == canonical_path(&workspace))
             .expect("Gemini project");
         assert_eq!(project.clients.get(&CliKind::Gemini), Some(&1));
         let snapshot = scan.latest.get(&CliKind::Gemini).expect("Gemini snapshot");

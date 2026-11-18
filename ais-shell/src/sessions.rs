@@ -428,10 +428,12 @@ mod tests {
 
     #[test]
     fn parses_ais_json_and_builds_resume_argv() {
+        let dir = std::env::temp_dir();
+        let dir_str = dir.to_string_lossy().into_owned();
         let value: Value = serde_json::json!({
             "client": "codex",
             "id": "01a1e030-3300",
-            "cwd": "/tmp",
+            "cwd": dir_str,
             "title": "fix\nthe build",
             "updated": 1_700_000_000.5,
             "status": "ready",
@@ -441,19 +443,21 @@ mod tests {
         assert_eq!(session.title, "fix the build");
         assert_eq!(session.short_id(), "01a1e030");
         let spec = session
-            .resume_spec(
-                Path::new("/"),
-                None,
-                Some("/opt/codex"),
-                &["--model".into(), "o3".into()],
-            )
+            .resume_spec(&dir, None, Some("/opt/codex"), &["--model".into(), "o3".into()])
             .expect("spec");
         assert_eq!(spec.program, "/opt/codex");
         assert_eq!(
             spec.args,
-            vec!["resume", "01a1e030-3300", "--cd", "/tmp", "--model", "o3"]
+            vec![
+                "resume".to_string(),
+                "01a1e030-3300".to_string(),
+                "--cd".to_string(),
+                dir_str,
+                "--model".to_string(),
+                "o3".to_string()
+            ]
         );
-        assert_eq!(spec.cwd, PathBuf::from("/tmp"));
+        assert_eq!(spec.cwd, dir);
     }
 
     #[test]
